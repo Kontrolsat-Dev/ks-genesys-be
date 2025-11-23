@@ -1,9 +1,7 @@
-# app/external/http_downloader.py
 from __future__ import annotations
 
-from typing import Any
-
 import httpx
+from typing import Any
 
 from app.core.config import settings
 
@@ -16,6 +14,66 @@ class HttpDownloader:
 
     def __init__(self, timeout_s: int | None = None) -> None:
         self.timeout_s = int(timeout_s or getattr(settings, "FEED_DOWNLOAD_TIMEOUT", 30))
+
+    async def _get_oauth_password_token(
+        self,
+        auth: dict[str, Any],
+        timeout: int,
+    ) -> tuple[str | None, str | None]:
+        """
+        Faz o fluxo oauth_password:
+          - Lê token_url (obrigatório)
+          - Lê token_method (opcional, default POST; pode ser "GET")
+          - Envia o resto dos campos como parâmetros (GET) ou form (POST)
+          - Espera um JSON com access_token ou token
+        """
+        token_url = auth.get("token_url") or auth.get("url") or auth.get("endpoint")
+        if not token_url:
+            return None, "oauth_password: token_url not provided"
+
+        method = str(auth.get("token_method") or "POST").upper()
+
+        # Enviamos todos os campos excepto estes
+        payload: dict[str, Any] = {}
+        for k, v in auth.items():
+            if k in {"token_url", "token_method", "access_token", "token"}:
+                continue
+            if v is None:
+                continue
+            payload[str(k)] = v
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as cli:
+                if method == "GET":
+                    resp = await cli.get(token_url, params=payload)
+                else:
+                    # POST com x-www-form-urlencoded (mais próximo do padrão OAuth)
+                    resp = await cli.post(
+                        token_url,
+                        data=payload,
+                        headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    )
+        except Exception as e:
+            return None, f"oauth_password token request failed: {e}"
+
+        try:
+            text_for_err = resp.text[:400]
+        except Exception:
+            text_for_err = None
+
+        if resp.status_code >= 400:
+            return None, f"oauth_password token request failed ({resp.status_code}): {text_for_err}"
+
+        try:
+            data = resp.json()
+        except Exception:
+            return None, f"oauth_password token response is not JSON: {text_for_err}"
+
+        token = data.get("access_token") or data.get("token")
+        if not token:
+            return None, "oauth_password token response missing 'access_token'"
+
+        return str(token), None
 
     async def fetch(
         self,
@@ -44,29 +102,39 @@ class HttpDownloader:
                     continue
                 h[str(k)] = str(v)
 
-        # auth
         httpx_auth = None
         ak = (auth_kind or "").lower()
+        bearer_token: str | None = None
+
         if ak == "basic" and isinstance(auth, dict):
             user = auth.get("username") or auth.get("user")
             pwd = auth.get("password") or auth.get("pass")
             if user is not None and pwd is not None:
                 httpx_auth = httpx.BasicAuth(str(user), str(pwd))
+
         elif ak == "bearer" and isinstance(auth, dict):
-            token = auth.get("token") or auth.get("access_token")
-            if token:
-                h.setdefault("Authorization", f"Bearer {token}")
+            bearer_token = auth.get("token") or auth.get("access_token")
+            if bearer_token:
+                h.setdefault("Authorization", f"Bearer {bearer_token}")
+
         elif ak in {"header", "apikey", "api_key"} and isinstance(auth, dict):
             # Ex.: {"header":"X-API-Key","value":"..."} ou {"name":"X-Token","value":"..."}
             key = auth.get("header") or auth.get("name")
             val = auth.get("value") or auth.get("token")
             if key and val:
                 h.setdefault(str(key), str(val))
+
         elif ak == "oauth_password" and isinstance(auth, dict):
-            # Para já tratamos como bearer token normal se vier "access_token"
-            token = auth.get("access_token")
-            if token:
-                h.setdefault("Authorization", f"Bearer {token}")
+            # 1) Se já tivermos access_token no auth, usamos direto
+            bearer_token = auth.get("access_token") or auth.get("token")
+            if not bearer_token:
+                # 2) Caso contrário, vamos buscar ao token_url (GET ou POST, configurável)
+                bearer_token, err = await self._get_oauth_password_token(auth, timeout)
+                if not bearer_token:
+                    return 599, None, b"", err or "oauth_password token request failed"
+                auth["access_token"] = bearer_token
+
+        h.setdefault("Authorization", f"Bearer {bearer_token}")
 
         # user-agent mínimo
         h.setdefault("Accept", "application/json,text/csv;q=0.9,*/*;q=0.1")

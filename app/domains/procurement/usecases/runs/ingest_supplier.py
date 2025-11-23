@@ -1,19 +1,20 @@
+# app/domains/procurement/usecases/runs/ingest_supplier.py
 from __future__ import annotations
 
 import json
 import logging
 from contextlib import suppress
-from sqlalchemy.exc import IntegrityError
 from typing import Any
 
-from app.core.errors import InvalidArgument, NotFound
-from app.core.normalize import normalize_images, normalize_simple, to_int, to_decimal_str
-from app.domains.catalog.services.active_offer import (
-    recalculate_active_offer_for_product,
-)
-from app.domains.catalog.services.sync_events import emit_product_state_event
+from app.core.errors import NotFound
 from app.domains.mapping.engine import IngestEngine
-from app.external.feed_downloader import FeedDownloader, parse_rows_json, parse_rows_csv
+from app.domains.procurement.services import (
+    FeedHttpError,
+    load_feed_rows,
+    process_row,
+    sync_active_offer_for_products,
+)
+from app.external.feed_downloader import FeedDownloader
 from app.infra.uow import UoW
 from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
 from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
@@ -35,66 +36,13 @@ from app.repositories.procurement.write.supplier_item_write_repo import (
 
 log = logging.getLogger("gsm.ingest")
 
-CANON_PRODUCT_KEYS = {
-    "gtin",
-    "mpn",
-    "partnumber",
-    "name",
-    "description",
-    "image_url",
-    "image_urls",
-    "category",
-    "weight",
-    "brand",
-}
-CANON_OFFER_KEYS = {"price", "stock", "sku"}
-
-
-def _split_payload(mapped: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    """
-    Separa o resultado do mapper em:
-    - product_payload (campos canónicos de produto)
-    - offer_payload   (preço/stock/sku + chaves técnicas)
-    - meta_payload    (resto dos campos, não-canónicos)
-    """
-    out_product = {
-        "gtin": (mapped.get("gtin") or "") or None,
-        "partnumber": (mapped.get("mpn") or mapped.get("partnumber") or "") or None,
-        "name": mapped.get("name"),
-        "description": mapped.get("description"),
-        "image_url": mapped.get("image_url"),
-        "weight_str": mapped.get("weight"),
-    }
-
-    # Preço: normalizar para decimal string “limpa” (39,99 € → "39.99")
-    raw_price = mapped.get("price")
-    price_str = to_decimal_str(raw_price) or "" if raw_price is not None else ""
-
-    # Stock: aguentar porcarias tipo "10+", " 5 ", "N/A" → 10, 5, 0
-    raw_stock = mapped.get("stock")
-    stock_int = to_int(raw_stock)
-    if stock_int is None:
-        stock_int = 0
-
-    out_offer = {
-        "price": price_str,
-        "stock": stock_int,
-        "sku": (mapped.get("sku") or mapped.get("partnumber") or mapped.get("gtin") or "").strip(),
-        "gtin": out_product["gtin"],
-        "partnumber": out_product["partnumber"],
-    }
-
-    used = set(CANON_PRODUCT_KEYS) | set(CANON_OFFER_KEYS)
-    meta = {k: v for k, v in mapped.items() if k not in used and v not in (None, "", [])}
-    return out_product, out_offer, meta
-
 
 async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> dict[str, Any]:
     """
     Orquestra uma run de ingest para um supplier:
 
     1) Valida supplier/feed e cria FeedRun.
-    2) Faz download + parse do feed (CSV/JSON).
+    2) Faz download + parse do feed (CSV/JSON, com suporte a paginação).
     3) Mapeia linhas via IngestEngine e, por cada linha válida:
        - Product.get_or_create + fill canonicals + brand/category + meta.
        - SupplierItem.upsert → deteta created/changed.
@@ -143,53 +91,55 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
     )
 
     try:
-        # --- 2) Download + parse feed ---
+        # --- 2) Download + parse feed (com suporte a paginação) ---
         headers = json.loads(feed.headers_json) if getattr(feed, "headers_json", None) else None
         params = json.loads(feed.params_json) if getattr(feed, "params_json", None) else None
         auth = json.loads(feed.auth_json) if getattr(feed, "auth_json", None) else None
         extra = json.loads(feed.extra_json) if getattr(feed, "extra_json", None) else None
 
+        # extra_fields.json_root → raiz da lista de dados JSON (ex.: "productos")
+        json_root: str | None = None
+        if isinstance(extra, dict):
+            ef = extra.get("extra_fields")
+            if isinstance(ef, dict):
+                jr = ef.get("json_root")
+                if isinstance(jr, str) and jr.strip():
+                    json_root = jr.strip()
+
         downloader = FeedDownloader()
+        fmt = (feed.format or "").lower()
 
-        status_code, content_type, raw, err_text = await downloader.download_feed(
-            kind=getattr(feed, "kind", None),
-            url=feed.url,
-            headers=headers,
-            params=params,
-            auth_kind=getattr(feed, "auth_kind", None),
-            auth=auth,
-            extra=extra,
-            timeout_s=60,
-        )
-
-        if status_code < 200 or status_code >= 300:
+        try:
+            rows, total = await load_feed_rows(
+                downloader=downloader,
+                feed=feed,
+                headers=headers,
+                params=params,
+                auth=auth,
+                extra=extra,
+                fmt=fmt,
+                json_root=json_root,
+                limit=limit,
+                log_prefix=f"run={id_run}",
+            )
+        except FeedHttpError as http_err:
             run_w.finalize_http_error(
                 id_run,
-                http_status=status_code,
-                error_msg=err_text or f"HTTP {status_code}",
+                http_status=http_err.status_code,
+                error_msg=http_err.message,
             )
             uow.commit()
             log.error(
                 "[run=%s] download error: HTTP %s msg=%s",
                 id_run,
-                status_code,
-                err_text,
+                http_err.status_code,
+                http_err.message,
             )
-            return {"ok": False, "id_run": id_run, "error": f"HTTP {status_code}"}
-
-        fmt = (feed.format or "").lower()
-        if fmt == "json":
-            rows: list[dict[str, Any]] = parse_rows_json(raw)
-        else:
-            rows = parse_rows_csv(
-                raw,
-                delimiter=(feed.csv_delimiter or ","),
-                max_rows=None,
-            )
-
-        total = len(rows)
-        if limit is not None:
-            rows = rows[:limit]
+            return {
+                "ok": False,
+                "id_run": id_run,
+                "error": f"HTTP {http_err.status_code}",
+            }
 
         log.info(
             "[run=%s] fetched rows: total=%s using=%s",
@@ -206,120 +156,25 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
         ok = bad = changed = 0
 
         for idx, raw_row in enumerate(rows, 1):
-            mapped, err = engine.map_row(raw_row)
-            if not mapped:
-                bad += 1
-                log.warning("[run=%s] row#%s invalid (mapper): %s", id_run, idx, err)
-                continue
-
-            mapped = normalize_images(mapped)
-            product_payload, offer_payload, meta_payload = _split_payload(mapped)
-
-            gtin = product_payload.get("gtin") or None
-            pn = product_payload.get("partnumber") or None
-
-            raw_brand_name = mapped.get("brand") or None
-            raw_category_name = mapped.get("category") or None
-
-            brand_name = normalize_simple(raw_brand_name) if raw_brand_name else None
-            category_name = normalize_simple(raw_category_name) if raw_category_name else None
-
-            # 3.1) Produto canónico
-            try:
-                p = prod_w.get_or_create(
-                    gtin=gtin,
-                    partnumber=pn,
-                    brand_name=brand_name,
-                    default_margin=supplier_margin,
-                )
-            except InvalidArgument:
-                bad += 1
-                log.warning("[run=%s] row#%s skipped (no product key)", id_run, idx)
-                continue
-            except IntegrityError as ie:
-                # race/unique — tenta recuperar
-                db.rollback()
-                p = prod_w.get_by_gtin(gtin) if gtin else None
-                if not p and (brand_name and pn):
-                    try:
-                        p = prod_w.get_or_create(
-                            gtin=None,
-                            partnumber=pn,
-                            brand_name=brand_name,
-                            default_margin=supplier_margin,
-                        )
-                    except Exception:
-                        p = None
-
-                if not p:
-                    bad += 1
-                    log.warning(
-                        "[run=%s] row#%s skipped after IntegrityError: %s",
-                        id_run,
-                        idx,
-                        ie,
-                    )
-                    continue
-
-            # 3.2) Preencher campos canónicos vazios + brand/category
-            prod_w.fill_canonicals_if_empty(
-                p.id,
-                name=product_payload.get("name"),
-                description=product_payload.get("description"),
-                image_url=product_payload.get("image_url"),
-                weight_str=product_payload.get("weight_str"),
-                partnumber=pn,
-                gtin=gtin,
-            )
-            prod_w.fill_brand_category_if_empty(
-                p.id,
-                brand_name=brand_name,
-                category_name=category_name,
-            )
-
-            # 3.3) Meta não-canónica
-            for k, v in meta_payload.items():
-                if v in (None, "", []):
-                    continue
-                inserted, _conflict = prod_w.add_meta_if_missing(
-                    p.id,
-                    name=str(k),
-                    value=str(v),
-                )
-                if inserted:
-                    changed += 1
-
-            # 3.4) Upsert da oferta do fornecedor
-            price = offer_payload["price"]
-            stock = offer_payload["stock"]
-            sku = offer_payload["sku"] or (pn or gtin or f"row-{idx}")
-
-            _item, created, changed_item, old_price, old_stock = item_w.upsert(
-                id_feed=feed.id,
-                id_product=p.id,
-                sku=sku,
-                price=price,
-                stock=stock,
-                gtin=gtin,
-                partnumber=pn,
-                id_feed_run=id_run,
-            )
-
-            affected_products.add(p.id)
-
-            # 3.5) Evento por criação/alteração da oferta do supplier
-            changed += ev_w.record_from_item_change(
-                id_product=p.id,
+            ok_inc, bad_inc, changed_inc, product_id = process_row(
+                db=db,
+                raw_row=raw_row,
+                row_index=idx,
+                id_run=id_run,
                 id_supplier=id_supplier,
-                gtin=gtin,
-                new_price=price,
-                new_stock=stock,
-                created=created,
-                changed=changed_item,
-                id_feed_run=id_run,
+                feed=feed,
+                engine=engine,
+                prod_w=prod_w,
+                item_w=item_w,
+                ev_w=ev_w,
+                supplier_margin=supplier_margin,
             )
+            ok += ok_inc
+            bad += bad_inc
+            changed += changed_inc
+            if product_id:
+                affected_products.add(product_id)
 
-            ok += 1
             if idx % 500 == 0:
                 log.info(
                     "[run=%s] progress %s/%s ok=%s bad=%s",
@@ -343,43 +198,12 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
         log.info("[run=%s] EOL marked=%s", id_run, eol_marked)
 
         # --- 5) Active offer + eventos de estado (apenas para produtos com id_ecommerce) ---
-        for id_product in affected_products:
-            product = prod_r.get(id_product)
-
-            if not product:
-                continue
-
-            # snapshot da oferta ativa ANTES do recálculo
-            prev_active_snapshot: dict[str, Any] | None = None
-            if product.active_offer is not None:
-                ao = product.active_offer
-                prev_active_snapshot = {
-                    "id_supplier": ao.id_supplier,
-                    "id_supplier_item": ao.id_supplier_item,
-                    "unit_price_sent": float(ao.unit_price_sent)
-                    if ao.unit_price_sent is not None
-                    else None,
-                    "stock_sent": int(ao.stock_sent or 0),
-                }
-
-            # se o produto não está ligado ao PrestaShop, não há nada para emitir
-            if not product.id_ecommerce or product.id_ecommerce <= 0:
-                continue
-
-            # recalcula ProductActiveOffer com base nas SupplierItem atuais
-            new_active = recalculate_active_offer_for_product(
-                db,
-                id_product=id_product,
-            )
-
-            # emite evento apenas se o snapshot efetivo mudou
-            emit_product_state_event(
-                db,
-                product=product,
-                active_offer=new_active,
-                reason="ingest_supplier",
-                prev_active_snapshot=prev_active_snapshot,
-            )
+        sync_active_offer_for_products(
+            db,
+            prod_r,
+            affected_products=affected_products,
+            reason="ingest_supplier",
+        )
 
         # --- 6) Finalizar run + commit ---
         run_w.finalize_ok(
@@ -415,7 +239,7 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
             "status": status,
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # Hard-fail da run
         with suppress(Exception):
             db.rollback()

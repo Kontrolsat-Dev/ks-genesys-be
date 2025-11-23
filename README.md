@@ -53,6 +53,11 @@ Backend
 │  │  │  │  ├─ brands
 │  │  │  │  │  ├─ list_brands.py
 │  │  │  │  │  └─ __init__.py
+│  │  │  │  ├─ catalog_update_stream
+│  │  │  │  │  ├─ ack_events.py
+│  │  │  │  │  ├─ get_pending_events.py
+│  │  │  │  │  ├─ list_events.py
+│  │  │  │  │  └─ __init__.py
 │  │  │  │  ├─ categories
 │  │  │  │  │  ├─ list_categories.py
 │  │  │  │  │  └─ __init__.py
@@ -60,6 +65,7 @@ Backend
 │  │  │  │  │  ├─ get_product_by_gtin.py
 │  │  │  │  │  ├─ get_product_detail.py
 │  │  │  │  │  ├─ list_products.py
+│  │  │  │  │  ├─ update_margin.py
 │  │  │  │  │  └─ __init__.py
 │  │  │  │  └─ __init__.py
 │  │  │  └─ __init__.py
@@ -95,7 +101,10 @@ Backend
 │  │  └─ __init__.py
 │  ├─ external
 │  │  ├─ feed_downloader.py
+│  │  ├─ ftp_downloader.py
+│  │  ├─ http_downloader.py
 │  │  ├─ prestashop_client.py
+│  │  ├─ sftp_downloader.py
 │  │  └─ __init__.py
 │  ├─ helpers
 │  │  ├─ number_conversions.py
@@ -125,6 +134,7 @@ Backend
 │  │  ├─ catalog
 │  │  │  ├─ read
 │  │  │  │  ├─ brand_read_repo.py
+│  │  │  │  ├─ catalog_update_stream_read_repo.py
 │  │  │  │  ├─ category_read_repo.py
 │  │  │  │  ├─ products_read_repo.py
 │  │  │  │  ├─ product_active_offer_read_repo.py
@@ -175,6 +185,8 @@ Backend
 ├─ apps
 │  ├─ api_main.py
 │  └─ __init__.py
+├─ docs
+│  └─ elektro3_mapper.md
 ├─ Makefile
 ├─ pyproject.toml
 ├─ README.md

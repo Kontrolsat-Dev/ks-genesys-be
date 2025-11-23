@@ -1,4 +1,3 @@
-# app/external/feed_downloader.py
 from __future__ import annotations
 
 import csv
@@ -8,8 +7,9 @@ import zipfile
 from typing import Any
 from urllib.parse import urlparse
 
-from app.external.http_downloader import HttpDownloader
 from app.external.ftp_downloader import FtpDownloader
+from app.external.http_downloader import HttpDownloader
+from app.external.sftp_downloader import SftpDownloader
 from app.schemas.feeds import FeedTestRequest, FeedTestResponse
 
 MAX_PREVIEW_BYTES = 256 * 1024
@@ -67,21 +67,41 @@ def _guess_content_type_from_path(path: str | None) -> str | None:
     return None
 
 
+def _get_extra(extra: dict[str, Any] | None, key: str, default: Any = None) -> Any:
+    """
+    Lê um comando de extra ou extra["extra_fields"].
+
+    Útil para:
+      - compression, zip_entry_name, zip_entry_ext
+      - trigger_http_* (na _run_trigger)
+    """
+    if not isinstance(extra, dict):
+        return default
+    if key in extra and extra[key] is not None:
+        return extra[key]
+    ef = extra.get("extra_fields")
+    if isinstance(ef, dict) and key in ef and ef[key] is not None:
+        return ef[key]
+    return default
+
+
 class FeedDownloader:
     """
-    Orquestrador de download/preview de feeds HTTP/FTP.
+    Orquestrador de download/preview de feeds HTTP/FTP/SFTP.
 
     - Para HTTP, delega em HttpDownloader;
     - Para FTP/FTPS, delega em FtpDownloader;
-    - Suporta triggers HTTP para feeds FTP via extra_json plano:
+    - Para SFTP (sftp://), delega em SftpDownloader;
+    - Suporta triggers HTTP para feeds FTP/SFTP via extra/extra_fields:
         * trigger_http_url
         * trigger_http_method
         * trigger_http_headers
         * trigger_http_params
         * trigger_http_body_json
-    - Suporta compressão ZIP via extra_json:
+    - Suporta compressão ZIP via extra/extra_fields:
         * compression = "zip"
-        * zip_entry_name = "ficheiro.csv" (opcional)
+        * zip_entry_name = "ficheiro.csv" (opcional, nome específico)
+        * zip_entry_ext = "csv" (opcional, preferir essa extensão)
     """
 
     def __init__(self, timeout_s: int | None = None) -> None:
@@ -90,6 +110,7 @@ class FeedDownloader:
         self.timeout_s = int(timeout_s or getattr(settings, "FEED_DOWNLOAD_TIMEOUT", 30))
         self._http = HttpDownloader(timeout_s=self.timeout_s)
         self._ftp = FtpDownloader(timeout_s=self.timeout_s)
+        self._sftp = SftpDownloader(timeout_s=self.timeout_s)
 
     # -------------------- API principal --------------------
 
@@ -117,14 +138,23 @@ class FeedDownloader:
         ak = (auth_kind or "").lower()
         k = (kind or "").lower()
 
-        is_ftp = k == "ftp" or scheme in {"ftp", "ftps"} or ak == "ftp_password"
+        is_sftp = scheme == "sftp" or k == "sftp" or ak == "sftp_password"
+        is_ftp = (not is_sftp) and (k == "ftp" or scheme in {"ftp", "ftps"} or ak == "ftp_password")
 
-        # 1) Trigger HTTP opcional (tipicamente para feeds FTP como Globomatik)
-        if is_ftp and extra:
+        # 1) Trigger HTTP opcional (para feeds FTP/SFTP que precisam "abrir a torneira")
+        if (is_ftp or is_sftp) and extra:
             await self._run_trigger(extra, timeout)
 
         # 2) Download principal
-        if is_ftp:
+        if is_sftp:
+            status_code, content_type, raw, err_text = await self._sftp.fetch(
+                url=url,
+                auth_kind=auth_kind,
+                auth=auth,
+                timeout_s=timeout,
+                extra=extra,
+            )
+        elif is_ftp:
             status_code, content_type, raw, err_text = await self._ftp.fetch(
                 url=url,
                 auth_kind=auth_kind,
@@ -156,7 +186,7 @@ class FeedDownloader:
 
         # 3) Compressão (zip) opcional
         if 200 <= status_code < 300 and extra:
-            compression = str(extra.get("compression") or "").lower()
+            compression = str(_get_extra(extra, "compression", "") or "").lower()
             if compression == "zip":
                 try:
                     raw, content_type = self._decompress_zip(raw, content_type, extra)
@@ -192,7 +222,7 @@ class FeedDownloader:
                 error=str(e)[:300],
             )
 
-        # falha HTTP/FTP → devolve erro + pequeno corpo para debug
+        # falha HTTP/FTP/SFTP → devolve erro + pequeno corpo para debug
         if status_code < 200 or status_code >= 300:
             return FeedTestResponse(
                 ok=False,
@@ -206,23 +236,24 @@ class FeedDownloader:
 
         sample = (raw or b"")[:MAX_PREVIEW_BYTES]
 
-        # HTML → snippet curto apenas para debug/login-pages
-        if _looks_like_html(sample):
-            return FeedTestResponse(
-                ok=True,
-                status_code=status_code,
-                content_type=ct,
-                bytes_read=len(raw or b""),
-                preview_type=None,
-                rows_preview=[{"html_snippet": self._decode_best(sample, ct)[:1200]}],
-                error=None,
-            )
-
-        # decidir formato
+        # decidir formato com base no sample
         fmt = _infer_format(req.format, ct, sample)
 
+        # opcional: root da data (ex.: "productos", "data.items", etc.)
+        json_root: str | None = None
+        try:
+            if isinstance(req.extra, dict):
+                json_root_raw = _get_extra(req.extra, "json_root") or _get_extra(
+                    req.extra, "data_root"
+                )
+                if isinstance(json_root_raw, str) and json_root_raw.strip():
+                    json_root = json_root_raw.strip()
+        except Exception:
+            json_root = None
+
         if fmt == "json":
-            rows = parse_rows_json(sample)
+            # usar o corpo completo, não o sample truncado
+            rows = parse_rows_json(raw or b"", root_key=json_root)
             rows = rows[: (req.max_rows or 20)]
             return FeedTestResponse(
                 ok=True,
@@ -255,42 +286,29 @@ class FeedDownloader:
     async def _run_trigger(self, extra: dict[str, Any], timeout_s: int) -> None:
         """
         Executa trigger HTTP opcional (para feeds que precisam de "abrir a torneira"
-        antes de ler o ficheiro real, típico em alguns fornecedores via FTP).
+        antes de ler o ficheiro real, típico em alguns fornecedores via FTP/SFTP).
 
-        Agora também suporta configuração em extra["extra_fields"].
+        Lê as chaves quer em extra quer em extra["extra_fields"].
         """
         if not extra:
             return
 
-        def _get(key: str, default: Any = None) -> Any:
-            # 1) top-level
-            val = extra.get(key)
-            if val is not None:
-                return val
-            # 2) extra_fields, se existir
-            extra_fields = extra.get("extra_fields")
-            if isinstance(extra_fields, dict):
-                val2 = extra_fields.get(key, None)
-                if val2 is not None:
-                    return val2
-            return default
-
-        url = _get("trigger_http_url")
+        url = _get_extra(extra, "trigger_http_url")
         if not url:
             return
 
-        method_raw = _get("trigger_http_method")
+        method_raw = _get_extra(extra, "trigger_http_method")
         method = str(method_raw).upper() if method_raw else "GET"
 
-        headers = _get("trigger_http_headers")
+        headers = _get_extra(extra, "trigger_http_headers")
         if not isinstance(headers, dict):
             headers = None
 
-        params = _get("trigger_http_params")
+        params = _get_extra(extra, "trigger_http_params")
         if not isinstance(params, dict):
             params = None
 
-        body_json = _get("trigger_http_body_json")
+        body_json = _get_extra(extra, "trigger_http_body_json")
         if not isinstance(body_json, (dict, list)):
             body_json = None
 
@@ -316,6 +334,14 @@ class FeedDownloader:
     ) -> tuple[bytes, str | None]:
         """
         Descomprime ZIP em memória e devolve (conteúdo_extraído, content_type_ajustado).
+
+        Comandos em extra/extra_fields:
+          - zip_entry_name: nome específico do ficheiro dentro do ZIP
+          - zip_entry_ext: extensão preferida (ex.: "csv")
+
+        Caso zip_entry_name não seja fornecido, tenta:
+          1) escolher ficheiro com a extensão zip_entry_ext se existir;
+          2) caso contrário, o primeiro ficheiro "real" (não diretoria).
         """
         if not raw:
             raise ValueError("empty payload for zip decompression")
@@ -330,35 +356,75 @@ class FeedDownloader:
             if not members:
                 raise ValueError("zip archive is empty")
 
-            entry_name = extra.get("zip_entry_name")
-            chosen = None
+            # comandos
+            entry_name = _get_extra(extra, "zip_entry_name")
+            entry_ext_raw = _get_extra(extra, "zip_entry_ext")
+            entry_ext: str | None = None
+            if isinstance(entry_ext_raw, str) and entry_ext_raw.strip():
+                entry_ext = entry_ext_raw.lower().lstrip(".")
 
-            if isinstance(entry_name, str) and entry_name:
-                # tenta match exato primeiro
+            def _is_dir(info: zipfile.ZipInfo) -> bool:
+                is_dir_attr = getattr(info, "is_dir", None)
+                if callable(is_dir_attr):
+                    return is_dir_attr()
+                return info.filename.endswith("/")
+
+            chosen: zipfile.ZipInfo | None = None
+
+            # 1) Nome específico (se fornecido)
+            if isinstance(entry_name, str) and entry_name.strip():
+                wanted = entry_name.strip()
+                wanted_lower = wanted.lower()
+
+                # match exato e por basename (case-sensitive)
                 for info in members:
-                    if info.filename == entry_name:
+                    if _is_dir(info):
+                        continue
+                    name = info.filename
+                    base = name.rsplit("/", 1)[-1]
+                    if name == wanted or base == wanted:
                         chosen = info
                         break
-                # fallback: case-insensitive se não encontrar exato
+
+                # fallback case-insensitive
                 if chosen is None:
-                    low = entry_name.lower()
                     for info in members:
-                        if info.filename.lower() == low:
+                        if _is_dir(info):
+                            continue
+                        name = info.filename
+                        base = name.rsplit("/", 1)[-1]
+                        if name.lower() == wanted_lower or base.lower() == wanted_lower:
                             chosen = info
                             break
+
                 if chosen is None:
                     raise ValueError(f"zip entry '{entry_name}' not found")
-            else:
-                # escolhe o primeiro ficheiro "real" (não diretório)
+
+            # 2) Extensão preferida (se não houve nome específico)
+            if chosen is None and entry_ext:
+                candidates: list[zipfile.ZipInfo] = []
                 for info in members:
-                    # ZipInfo em 3.11 tem .is_dir(); se não existir, infere pelo nome
-                    is_dir = getattr(info, "is_dir", lambda: info.filename.endswith("/"))()
-                    if is_dir:
+                    if _is_dir(info):
                         continue
-                    chosen = info
-                    break
-                if chosen is None:
-                    raise ValueError("no file entries found inside zip archive")
+                    base = info.filename.rsplit("/", 1)[-1]
+                    if base.lower().endswith("." + entry_ext):
+                        candidates.append(info)
+
+                if len(candidates) == 1:
+                    chosen = candidates[0]
+                elif len(candidates) > 1:
+                    candidates.sort(key=lambda i: i.filename)
+                    chosen = candidates[-1]
+
+            # 3) Fallback: primeiro ficheiro "real"
+            if chosen is None:
+                for info in members:
+                    if not _is_dir(info):
+                        chosen = info
+                        break
+
+            if chosen is None:
+                raise ValueError("no file entries found inside zip archive")
 
             data = zf.read(chosen.filename)
             new_ct = content_type
@@ -396,7 +462,7 @@ async def http_download(
 ) -> tuple[int, str | None, bytes]:
     """
     Wrapper fino sobre FeedDownloader.download_feed para manter APIs antigas.
-    Decide HTTP vs FTP em função do kind/url/auth_kind.
+    Decide HTTP vs FTP/SFTP em função do kind/url/auth_kind.
     """
     downloader = FeedDownloader(timeout_s=timeout_s)
     try:
@@ -415,18 +481,48 @@ async def http_download(
     return status, ct, raw
 
 
-def parse_rows_json(raw: bytes) -> list[dict]:
+def parse_rows_json(raw: bytes, *, root_key: str | None = None) -> list[dict]:
     """
-    Extrai linhas (dicts) de JSON (lista, {data|items|results|products|rows|list}, objeto único),
-    ou NDJSON (uma linha JSON por linha).
+    Extrai linhas (dicts) de JSON:
+
+    - lista direta
+    - dict com root explícita (root_key, ex.: "productos" ou "data.items")
+    - dict com chaves standard: data|items|results|products|productos|rows|list
+    - ou NDJSON (uma linha JSON por linha)
     """
     # 1) JSON tradicional
     try:
         obj = json.loads(raw.decode(errors="ignore"))
+
+        # Se tiver root_key configurado (ex.: "productos" ou "data.items")
+        if root_key:
+            cur: Any = obj
+            for part in str(root_key).split("."):
+                if isinstance(cur, dict) and part in cur:
+                    cur = cur[part]
+                else:
+                    cur = None
+                    break
+
+            if isinstance(cur, list):
+                return [x for x in cur if isinstance(x, dict)]
+            # se cairmos num dict, usamos heurística abaixo sobre esse dict
+            if isinstance(cur, dict):
+                obj = cur
+
         if isinstance(obj, list):
             return [x for x in obj if isinstance(x, dict)]
+
         if isinstance(obj, dict):
-            for key in ("data", "items", "results", "products", "rows", "list"):
+            for key in (
+                "data",
+                "items",
+                "results",
+                "products",
+                "productos",
+                "rows",
+                "list",
+            ):
                 v = obj.get(key)
                 if isinstance(v, list):
                     return [x for x in v if isinstance(x, dict)]

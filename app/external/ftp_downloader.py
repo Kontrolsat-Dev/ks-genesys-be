@@ -1,4 +1,3 @@
-# app/external/ftp_downloader.py
 from __future__ import annotations
 
 import asyncio
@@ -23,6 +22,22 @@ def _guess_content_type_from_path(path: str | None) -> str | None:
     return None
 
 
+def _get_extra(extra: dict[str, Any] | None, key: str, default: Any = None) -> Any:
+    """
+    Lê um comando de extra ou extra["extra_fields"].
+
+    Dá prioridade ao topo, depois a extra_fields.
+    """
+    if not isinstance(extra, dict):
+        return default
+    if key in extra and extra[key] is not None:
+        return extra[key]
+    ef = extra.get("extra_fields")
+    if isinstance(ef, dict) and key in ef and ef[key] is not None:
+        return ef[key]
+    return default
+
+
 class FtpDownloader:
     """
     Downloader FTP/FTPS simples para feeds.
@@ -32,8 +47,8 @@ class FtpDownloader:
       - ou em auth_json com chaves: host/hostname/server/ftp_hostname,
         username/user/ftp_username, password/pass/ftp_password, port.
 
-    Suporta ainda campos extra (diretamente ou em extra["extra_fields"]):
-      - ftp_file_ext: "csv", "zip", ...
+    Suporta ainda comandos em extra / extra["extra_fields"]:
+      - ftp_file_ext: "csv", "zip", ... (filtra ficheiros por extensão)
       - ftp_auto_latest: "1"/"true"/"yes"/"on" → escolhe ficheiro mais "recente"
       - ftp_dir: diretoria específica (ex.: "/feeds")
     """
@@ -60,17 +75,6 @@ class FtpDownloader:
 
         def _run_sync() -> tuple[int, str | None, bytes, str | None]:
             import ftplib  # stdlib
-
-            # helper: lê de extra ou extra["extra_fields"]
-            def _get_extra(key: str, default: Any = None) -> Any:
-                if not isinstance(extra, dict):
-                    return default
-                if key in extra:
-                    return extra[key]
-                ef = extra.get("extra_fields")
-                if isinstance(ef, dict) and key in ef:
-                    return ef[key]
-                return default
 
             parsed = urlparse(url or "")
             scheme = (parsed.scheme or "").lower()
@@ -109,13 +113,13 @@ class FtpDownloader:
             user = user or "anonymous"
             pwd = pwd or "anonymous@"
 
-            # ---- extras: auto-latest + extensão + diretoria ----
-            ftp_file_ext_raw = _get_extra("ftp_file_ext")
+            # ---- comandos extra: auto-latest + extensão + diretoria ----
+            ftp_file_ext_raw = _get_extra(extra, "ftp_file_ext")
             ftp_file_ext = ""
             if isinstance(ftp_file_ext_raw, str) and ftp_file_ext_raw.strip():
                 ftp_file_ext = ftp_file_ext_raw.lower().lstrip(".")
 
-            ftp_auto_latest_raw = _get_extra("ftp_auto_latest")
+            ftp_auto_latest_raw = _get_extra(extra, "ftp_auto_latest")
             ftp_auto_latest = False
             if ftp_auto_latest_raw is not None:
                 ftp_auto_latest = str(ftp_auto_latest_raw).lower() in {
@@ -125,7 +129,7 @@ class FtpDownloader:
                     "on",
                 }
 
-            ftp_dir_extra = _get_extra("ftp_dir")
+            ftp_dir_extra = _get_extra(extra, "ftp_dir")
 
             path_local = path or ""
             ftp_cls = ftplib.FTP_TLS if scheme == "ftps" else ftplib.FTP
@@ -141,18 +145,18 @@ class FtpDownloader:
                     dir_path: str | None = None
 
                     if ftp_auto_latest:
-                        # modo auto-latest: vamos sempre listar diretoria
+                        # modo auto-latest: lista sempre diretoria
                         if isinstance(ftp_dir_extra, str) and ftp_dir_extra.strip():
                             dir_path = ftp_dir_extra
                         else:
-                            # se o path começa por '/', assumimos que é diretoria; senão, root
+                            # se o path começa por '/', assumimos diretoria; senão, root
                             if path_local.startswith("/"):
                                 dir_path = path_local
                             else:
                                 dir_path = "."
                         is_dir = True
                     else:
-                        # comportamento antigo: diretoria se vazio, '/', '.', ou terminar em '/'
+                        # comportamento "normal": diretoria se vazio, '/', '.', ou terminar em '/'
                         is_dir = path_local in {"", "/", "."} or path_local.endswith("/")
                         if is_dir:
                             dir_path = path_local or "."
@@ -181,6 +185,7 @@ class FtpDownloader:
                                 "No matching files found in FTP directory",
                             )
 
+                        # ordenação determinística por nome
                         candidates_sorted = sorted(candidates)
                         chosen = candidates_sorted[-1] if ftp_auto_latest else candidates_sorted[0]
                         target_path = chosen
@@ -195,7 +200,7 @@ class FtpDownloader:
                     ftp.retrbinary(f"RETR {target_path}", _collector)
                     raw = b"".join(chunks)
 
-                    # ⚠️ Se não quiseres apagar os ficheiros da Globomatik, comenta isto:
+                    # Se não quiseres apagar no fornecedor, comenta isto:
                     try:
                         ftp.delete(target_path)
                     except Exception:
@@ -206,7 +211,6 @@ class FtpDownloader:
             except Exception as e:
                 return 599, None, b"", str(e)
 
-        # 👇 ISTO É O QUE TE ESTAVA A FALTAR SE ESTIVERES A VER O "NoneType":
         try:
             return await asyncio.to_thread(_run_sync)
         except Exception as e:
