@@ -6,7 +6,9 @@ import json
 from app.core.errors import NotFound  # << usar AppError
 from app.infra.uow import UoW
 from app.repositories.procurement.read.mapper_read_repo import MapperReadRepository
-from app.repositories.procurement.read.supplier_feed_read_repo import SupplierFeedReadRepository
+from app.repositories.procurement.read.supplier_feed_read_repo import (
+    SupplierFeedReadRepository,
+)
 from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
 from app.schemas.feeds import SupplierFeedOut
 from app.schemas.mappers import FeedMapperOut
@@ -26,6 +28,9 @@ def _supplier_to_out(s) -> SupplierOut:
         country=s.country,
         created_at=s.created_at,
         updated_at=s.updated_at,
+        ingest_enabled=s.ingest_enabled,
+        ingest_next_run_at=s.ingest_next_run_at,
+        ingest_interval_minutes=s.ingest_interval_minutes,
     )
 
 

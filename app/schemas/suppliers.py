@@ -15,6 +15,9 @@ class SupplierCreate(BaseModel):
     contact_email: str | None = None
     margin: float = 0
     country: str | None = None
+    ingest_enabled: bool = True
+    ingest_interval_minutes: int | None = None
+    ingest_next_run_at: str | None = None
 
 
 class SupplierUpdate(BaseModel):
@@ -26,6 +29,9 @@ class SupplierUpdate(BaseModel):
     contact_email: str | None = None
     margin: float | None = None
     country: str | None = None
+    ingest_enabled: bool | None = None
+    ingest_interval_minutes: int | None = None
+    ingest_next_run_at: datetime | None = None
 
 
 class SupplierOut(BaseModel):
@@ -40,6 +46,9 @@ class SupplierOut(BaseModel):
     country: str | None
     created_at: datetime
     updated_at: datetime | None
+    ingest_enabled: bool = True
+    ingest_interval_minutes: int | None = None
+    ingest_next_run_at: datetime | None = None
 
     class Config:
         from_attributes = True

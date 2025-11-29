@@ -11,10 +11,16 @@ from app.domains.procurement.usecases.suppliers.get_supplier_detail import (
     execute as uc_get_detail,
 )
 from app.infra.uow import UoW
-from app.repositories.procurement.read.supplier_feed_read_repo import SupplierFeedReadRepository
+from app.repositories.procurement.read.supplier_feed_read_repo import (
+    SupplierFeedReadRepository,
+)
 from app.repositories.procurement.write.mapper_write_repo import MapperWriteRepository
-from app.repositories.procurement.write.supplier_feed_write_repo import SupplierFeedWriteRepository
-from app.repositories.procurement.write.supplier_write_repo import SupplierWriteRepository
+from app.repositories.procurement.write.supplier_feed_write_repo import (
+    SupplierFeedWriteRepository,
+)
+from app.repositories.procurement.write.supplier_write_repo import (
+    SupplierWriteRepository,
+)
 from app.schemas.suppliers import SupplierBundleUpdate, SupplierDetailOut
 
 log = logging.getLogger("gsm.http")
@@ -43,6 +49,9 @@ def _update_supplier_fields(
         "contact_email",
         "margin",
         "country",
+        "ingest_interval_minutes",
+        "ingest_enabled",
+        "ingest_next_run_at",
     ):
         if hasattr(supplier_data, f):
             v = getattr(supplier_data, f)

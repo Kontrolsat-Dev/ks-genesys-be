@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -87,6 +88,9 @@ class SupplierWriteRepository:
         contact_phone: str | None = None,
         margin: float | None = None,
         country: str | None = None,
+        ingest_enabled: bool | None = None,
+        ingest_interval_minutes: int | None = None,
+        ingest_next_run_at: datetime | None = None,
     ) -> Supplier:
         s = self.db.get(Supplier, id_supplier)
         if not s:
@@ -116,6 +120,12 @@ class SupplierWriteRepository:
             s.margin = margin
         if country is not None:
             s.country = country or None
+        if ingest_enabled is not None:
+            s.ingest_enabled = ingest_enabled
+        if ingest_interval_minutes is not None:
+            s.ingest_interval_minutes = ingest_interval_minutes
+        if ingest_next_run_at is not None:
+            s.ingest_next_run_at = ingest_next_run_at
 
         self.db.flush()
         return s
