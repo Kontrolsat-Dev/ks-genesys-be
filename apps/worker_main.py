@@ -8,16 +8,16 @@ import os
 import socket
 from datetime import datetime, timedelta, UTC
 
-from app.core.logging import setup_logging
 from app.background.job_handlers import (
     JOB_KIND_SUPPLIER_INGEST,
     dispatch_job,
 )
+from app.core.logging import setup_logging
 from app.domains.worker.usecases.schedule_supplier_ingest_jobs import (
     schedule_supplier_ingest_jobs,
 )
-from app.infra.uow import UoW
 from app.infra.session import SessionLocal
+from app.infra.uow import UoW
 from app.models.supplier import Supplier
 from app.repositories.worker.read.worker_activity_read_repo import (
     WorkerActivityReadRepository,
@@ -78,6 +78,23 @@ async def run_worker_loop() -> None:
                 if job_kind not in handled_kinds:
                     continue
 
+                # 3.1) Watchdog: jobs 'running' stale contam como erro e vão a retries
+                stale_count = job_w.mark_stale_running_jobs_as_failed(
+                    job_kind=job_kind,
+                    now=now,
+                    # "bastante tempo": ajusta se quiseres, 60 min é razoável para ingest
+                    stale_after=timedelta(minutes=60),
+                    max_attempts=cfg.max_attempts,
+                    backoff_seconds=cfg.backoff_seconds,
+                )
+                if stale_count:
+                    logger.warning(
+                        "Marked %d stale job(s) as failed for kind=%s (watchdog)",
+                        stale_count,
+                        job_kind,
+                    )
+
+                # 3.2) Claim normal
                 max_batch = max(cfg.max_concurrency, 1)
 
                 jobs = job_w.claim_pending_jobs(

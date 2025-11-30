@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
-from typing import Any
-
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+from typing import Any
 
 from app.core.errors import NotFound
 from app.models.worker_job import WorkerJob
@@ -60,7 +59,7 @@ class WorkerJobWriteRepository:
             select(WorkerJob)
             .where(WorkerJob.job_kind == job_kind)
             .where(WorkerJob.status == "pending")
-            .where((WorkerJob.not_before is None) | (WorkerJob.not_before <= now))  # noqa: E711
+            .where(WorkerJob.not_before.is_(None) | (WorkerJob.not_before <= now))
             .order_by(WorkerJob.priority.asc(), WorkerJob.created_at.asc())
             .limit(limit)
             .with_for_update(skip_locked=False)
@@ -118,3 +117,43 @@ class WorkerJobWriteRepository:
             job.locked_by = None
 
         self._db.flush()
+
+    def mark_stale_running_jobs_as_failed(
+        self,
+        *,
+        job_kind: str,
+        now: datetime,
+        stale_after: timedelta,
+        max_attempts: int,
+        backoff_seconds: int,
+    ) -> int:
+        """
+        Considera jobs 'running' há demasiado tempo como erro (stale) e aplica
+        a mesma lógica de falha normal: incrementa attempts e, se ainda não
+        bateu no max_attempts, volta a colocar em pending com backoff.
+        """
+        cutoff = now - stale_after
+
+        # buscar só os ids dos jobs stale
+        stmt = (
+            select(WorkerJob.id_job)
+            .where(WorkerJob.job_kind == job_kind)
+            .where(WorkerJob.status == "running")
+            .where(WorkerJob.locked_at != None)  # noqa: E711
+            .where(WorkerJob.locked_at < cutoff)
+        )
+
+        ids = [row[0] for row in self._db.execute(stmt).all()]
+
+        for id_job in ids:
+            # Reutilizamos a lógica de falha normal
+            self.mark_failed(
+                id_job,
+                finished_at=now,
+                error_message="Stale running job watchdog: exceeded max runtime",
+                max_attempts=max_attempts,
+                backoff_seconds=backoff_seconds,
+            )
+
+        # mark_failed já faz flush
+        return len(ids)
