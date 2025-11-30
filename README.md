@@ -1,4 +1,3 @@
-
 ```
 Backend
 ├─ .pre-commit-config.yaml
@@ -73,6 +72,11 @@ Backend
 │  │  │  ├─ engine.py
 │  │  │  └─ __init__.py
 │  │  ├─ procurement
+│  │  │  ├─ services
+│  │  │  │  ├─ active_offer_sync.py
+│  │  │  │  ├─ feed_loader.py
+│  │  │  │  ├─ row_ingest.py
+│  │  │  │  └─ __init__.py
 │  │  │  ├─ usecases
 │  │  │  │  ├─ feeds
 │  │  │  │  │  ├─ delete_supplier_feed.py

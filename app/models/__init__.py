@@ -14,6 +14,8 @@ from .supplier_feed import SupplierFeed
 from .supplier_item import SupplierItem
 from .product_active_offer import ProductActiveOffer
 from .catalog_update_stream import CatalogUpdateStream
+from .worker_activity_config import WorkerActivityConfig
+from .worker_job import WorkerJob
 
 __all__ = [
     "Base",
@@ -32,6 +34,8 @@ __all__ = [
     "SupplierItem",
     "ProductActiveOffer",
     "CatalogUpdateStream",
+    "WorkerActivityConfig",
+    "WorkerJob",
 ]
 
 

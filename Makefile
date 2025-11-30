@@ -15,13 +15,13 @@ UVICORN := $(PYTHON) -m uvicorn
 UV ?=
 
 # -------- App config --------
-APP       ?= apps.api_main:app         # muda para apps.api_main:app se esse for o entrypoint
+APP       ?= apps.api_main:app
 HOST      ?= 127.0.0.1
-HOST_LIVE      ?= 0.0.0.0
+HOST_LIVE ?= 0.0.0.0
 PORT      ?= 8000
 LOG_LEVEL ?= debug
 
-.PHONY: venv install dev clean
+.PHONY: venv install dev prod clean worker
 
 ## Cria o virtualenv (se não existir)
 ifeq ($(OS),Windows_NT)
@@ -47,6 +47,7 @@ endif
 dev: install
 	$(UVICORN) $(APP) --host $(HOST) --port $(PORT) --reload --log-level $(LOG_LEVEL)
 
+## Arranca o servidor em modo "prod simples" (sem debug host)
 prod: install
 	$(UVICORN) $(APP) --host $(HOST_LIVE) --port $(PORT) --reload --log-level $(LOG_LEVEL)
 
@@ -54,6 +55,6 @@ prod: install
 clean:
 	@rm -rf __pycache__ .pytest_cache .mypy_cache || true
 
-## Workers
-worker:
+## Workers (entrypoint oficial dos jobs)
+worker: install
 	$(PYTHON) -m apps.worker_main
