@@ -1,4 +1,5 @@
 # app/repositories/worker/read/worker_job_read_repo.py
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -6,8 +7,8 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.worker_job import WorkerJob
 from app.core.errors import NotFound
+from app.models.worker_job import WorkerJob
 
 
 class WorkerJobReadRepository:

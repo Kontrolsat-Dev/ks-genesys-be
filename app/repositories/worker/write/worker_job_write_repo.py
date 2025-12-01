@@ -1,11 +1,13 @@
 # app/repositories/worker/write/worker_job_write_repo.py
+
 from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
+from typing import Any
+
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
-from typing import Any
 
 from app.core.errors import NotFound
 from app.models.worker_job import WorkerJob
@@ -111,7 +113,9 @@ class WorkerJobWriteRepository:
         else:
             # volta a pending com backoff
             job.status = "pending"
-            job.not_before = finished_at.replace(microsecond=0) + timedelta(seconds=backoff_seconds)
+            job.not_before = finished_at.replace(microsecond=0) + timedelta(
+                seconds=backoff_seconds,
+            )
             job.started_at = None
             job.locked_at = None
             job.locked_by = None
@@ -134,19 +138,17 @@ class WorkerJobWriteRepository:
         """
         cutoff = now - stale_after
 
-        # buscar só os ids dos jobs stale
         stmt = (
             select(WorkerJob.id_job)
             .where(WorkerJob.job_kind == job_kind)
             .where(WorkerJob.status == "running")
-            .where(WorkerJob.locked_at != None)  # noqa: E711
+            .where(WorkerJob.locked_at.is_not(None))
             .where(WorkerJob.locked_at < cutoff)
         )
 
         ids = [row[0] for row in self._db.execute(stmt).all()]
 
         for id_job in ids:
-            # Reutilizamos a lógica de falha normal
             self.mark_failed(
                 id_job,
                 finished_at=now,

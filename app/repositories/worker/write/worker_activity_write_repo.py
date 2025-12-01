@@ -1,4 +1,5 @@
 # app/repositories/worker/write/worker_activity_write_repo.py
+
 from __future__ import annotations
 
 from sqlalchemy import select
@@ -17,7 +18,9 @@ class WorkerActivityWriteRepository:
         *,
         default_max_concurrency: int = 1,
     ) -> WorkerActivityConfig:
-        stmt = select(WorkerActivityConfig).where(WorkerActivityConfig.job_kind == job_kind)
+        stmt = select(WorkerActivityConfig).where(
+            WorkerActivityConfig.job_kind == job_kind,
+        )
         cfg = self._db.execute(stmt).scalar_one_or_none()
         if cfg:
             return cfg

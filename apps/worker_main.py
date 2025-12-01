@@ -6,7 +6,7 @@ import asyncio
 import logging
 import os
 import socket
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 from app.background.job_handlers import (
     JOB_KIND_SUPPLIER_INGEST,
@@ -42,6 +42,7 @@ async def run_worker_loop() -> None:
     worker_id = f"{socket.gethostname()}-{os.getpid()}"
     logger.info("Starting worker process %s", worker_id)
 
+    # Por agora só tratamos supplier_ingest
     handled_kinds = [JOB_KIND_SUPPLIER_INGEST]
 
     while True:
@@ -69,7 +70,13 @@ async def run_worker_loop() -> None:
                 if job_kind not in handled_kinds:
                     continue
 
-                stale_after_seconds = getattr(cfg, "stale_after_seconds", None) or 600
+                # Para supplier_ingest assumimos jobs longos → default mais generoso
+                if job_kind == JOB_KIND_SUPPLIER_INGEST:
+                    default_stale = 3600  # 1 hora (ajusta para 2h se precisares)
+                else:
+                    default_stale = 600  # 10 minutos para outros job kinds
+
+                stale_after_seconds = getattr(cfg, "stale_after_seconds", None) or default_stale
                 backoff_seconds = cfg.backoff_seconds
                 max_attempts = cfg.max_attempts
 
@@ -98,6 +105,7 @@ async def run_worker_loop() -> None:
                 created = schedule_supplier_ingest_jobs(uow, now=now)
                 if created:
                     logger.info("Scheduled %d supplier_ingest jobs", created)
+                # commit do agendamento/atualização de ingest_next_run_at
                 uow.commit()
 
             # 4) Executar jobs para cada kind
@@ -123,6 +131,7 @@ async def run_worker_loop() -> None:
                     job_kind,
                 )
 
+                # Processamento sequencial dentro deste worker
                 for job in jobs:
                     try:
                         await dispatch_job(job.job_kind, job.payload_json or "{}", uow)
@@ -130,6 +139,8 @@ async def run_worker_loop() -> None:
                         finished_at = _utcnow()
                         job_w.mark_done(job.id_job, finished_at=finished_at)
 
+                        # Lógica específica para supplier_ingest:
+                        # agendar próxima run + atualizar ingest_next_run_at
                         if job.job_kind == JOB_KIND_SUPPLIER_INGEST:
                             _schedule_next_for_supplier_after_run(
                                 uow,
@@ -142,9 +153,10 @@ async def run_worker_loop() -> None:
                             job.id_job,
                             job.job_kind,
                         )
+                        # commit por job -> transações pequenas
                         uow.commit()
 
-                    except Exception as err:
+                    except Exception as err:  # noqa: BLE001
                         finished_at = _utcnow()
                         err_msg = str(err)
                         logger.exception(
@@ -175,13 +187,19 @@ def _schedule_next_for_supplier_after_run(
 ) -> None:
     """
     Depois de uma ingest, agenda a próxima run para este supplier com base no intervalo atual.
+
+    Aqui:
+    - job.payload_json tem {"id_supplier": X}
+    - calculamos finished_at + ingest_interval_minutes
+    - criamos novo job supplier_ingest com not_before=next_time
+    - atualizamos supplier.ingest_next_run_at = next_time (visibilidade)
     """
     import json
 
+    from app.background.job_handlers import JOB_KIND_SUPPLIER_INGEST
     from app.repositories.worker.write.worker_job_write_repo import (
         WorkerJobWriteRepository,
     )
-    from app.background.job_handlers import JOB_KIND_SUPPLIER_INGEST
 
     payload = json.loads(job.payload_json or "{}")
     id_supplier = payload.get("id_supplier")
