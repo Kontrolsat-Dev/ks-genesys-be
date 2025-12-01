@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+from typing import Literal
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -120,3 +122,28 @@ class ProductMarginUpdate(BaseModel):
     """
 
     margin: float = Field(..., ge=0.0)
+
+
+# --------------------------
+
+
+class ProductPriceChangeOut(BaseModel):
+    id_product: int
+    name: str
+    brand_name: str
+    category_name: str
+
+    current_price: Decimal
+    previous_price: Decimal
+    delta_abs: Decimal
+    delta_pct: Decimal
+    direction: Literal["up", "down"]
+
+    updated_at: datetime
+
+
+class ProductPriceChangeListOut(BaseModel):
+    items: list[ProductPriceChangeOut]
+    total: int
+    page: int
+    page_size: int

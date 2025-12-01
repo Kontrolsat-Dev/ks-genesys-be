@@ -17,8 +17,19 @@ from app.domains.catalog.usecases.products.list_products import (
 from app.domains.catalog.usecases.products.update_margin import (
     execute as uc_update_product_margin,
 )
+from app.domains.catalog.usecases.products.list_active_offer_price_changes import (
+    execute as uc_list_active_offer_price_changes,
+)
+from app.domains.catalog.usecases.products.list_catalog_price_changes import (
+    execute as uc_list_catalog_price_changes,
+)
 from app.infra.uow import UoW
-from app.schemas.products import ProductDetailOut, ProductListOut, ProductMarginUpdate
+from app.schemas.products import (
+    ProductDetailOut,
+    ProductListOut,
+    ProductMarginUpdate,
+    ProductPriceChangeListOut,
+)
 
 router = APIRouter(
     prefix="/products", tags=["products"], dependencies=[Depends(require_access_token)]
@@ -154,4 +165,87 @@ def update_product_margin(
         events_days=events_days,
         events_limit=events_limit,
         aggregate_daily=aggregate_daily,
+    )
+
+
+@router.get(
+    "/active-offer/price-changes",
+    response_model=ProductPriceChangeListOut,
+    summary="Listar produtos com alterações de preço na active_offer",
+)
+def list_active_offer_price_changes(
+    uow: UowDep,
+    direction: Literal["up", "down", "both"] = Query(
+        "down",
+        description="Filtrar por quedas (down), subidas (up) ou ambos (both).",
+    ),
+    days: int = Query(
+        7,
+        ge=1,
+        le=365,
+        description="Janela temporal em dias para olhar os eventos.",
+    ),
+    min_abs_delta: float | None = Query(
+        None,
+        ge=0,
+        description="Variação mínima em euros (absoluto).",
+    ),
+    min_pct_delta: float | None = Query(
+        None,
+        ge=0,
+        le=1000,
+        description="Variação mínima em percentagem (absoluto).",
+    ),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+) -> ProductPriceChangeListOut:
+    return uc_list_active_offer_price_changes(
+        uow,
+        direction=direction,
+        days=days,
+        min_abs_delta=min_abs_delta,
+        min_pct_delta=min_pct_delta,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get(
+    "/price-changes/catalog",
+    response_model=ProductPriceChangeListOut,
+    summary="Listar movimentos de preço para produtos não importados (catálogo)",
+)
+def list_catalog_price_changes(
+    uow: UowDep,
+    direction: Literal["up", "down", "both"] = Query(
+        "down",
+        description="up= subidas, down= quedas, both= ambos",
+    ),
+    days: int = Query(
+        30,
+        ge=1,
+        le=365,
+        description="Janela temporal em dias para procurar alterações",
+    ),
+    min_abs_delta: float | None = Query(
+        0,
+        ge=0,
+        description="Mínimo de variação absoluta em € (0 para desligar filtro)",
+    ),
+    min_pct_delta: float | None = Query(
+        5,
+        ge=0,
+        description="Mínimo de variação percentual (0 para desligar filtro)",
+    ),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+) -> ProductPriceChangeListOut:
+    return uc_list_catalog_price_changes(
+        uow,
+        direction=direction,
+        days=days,
+        min_abs_delta=min_abs_delta,
+        min_pct_delta=min_pct_delta,
+        page=page,
+        page_size=page_size,
     )
