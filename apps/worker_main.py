@@ -40,17 +40,14 @@ async def run_worker_loop() -> None:
     setup_logging()
 
     worker_id = f"{socket.gethostname()}-{os.getpid()}"
-
     logger.info("Starting worker process %s", worker_id)
 
-    # Por agora só tratamos supplier_ingest
     handled_kinds = [JOB_KIND_SUPPLIER_INGEST]
 
     while True:
         now = _utcnow()
         poll_intervals: list[int] = []
 
-        # Uma iteração = 1 ciclo de schedule + execução de jobs
         with SessionLocal() as db:
             uow = UoW(db)
 
@@ -62,39 +59,52 @@ async def run_worker_loop() -> None:
             act_r = WorkerActivityReadRepository(db)
             configs = {cfg.job_kind: cfg for cfg in act_r.list_enabled()}
 
-            # Guardar já os intervalos em ints (para não depender de ORM fora da sessão)
             poll_intervals = [cfg.poll_interval_seconds for cfg in configs.values()]
 
-            # 2) Scheduler: garantir jobs para suppliers (só supplier_ingest, por agora)
-            if JOB_KIND_SUPPLIER_INGEST in configs:
-                created = schedule_supplier_ingest_jobs(uow, now=now)
-                if created:
-                    logger.info("Scheduled %d supplier_ingest jobs", created)
-
-            # 3) Executar jobs para cada kind
             job_w = WorkerJobWriteRepository(db)
 
+            # 2) Watchdog: marcar jobs 'running' demasiado tempo como failed/pending
+            total_stale = 0
             for job_kind, cfg in configs.items():
                 if job_kind not in handled_kinds:
                     continue
 
-                # 3.1) Watchdog: jobs 'running' stale contam como erro e vão a retries
+                stale_after_seconds = getattr(cfg, "stale_after_seconds", None) or 600
+                backoff_seconds = cfg.backoff_seconds
+                max_attempts = cfg.max_attempts
+
                 stale_count = job_w.mark_stale_running_jobs_as_failed(
                     job_kind=job_kind,
                     now=now,
-                    # "bastante tempo": ajusta se quiseres, 60 min é razoável para ingest
-                    stale_after=timedelta(minutes=60),
-                    max_attempts=cfg.max_attempts,
-                    backoff_seconds=cfg.backoff_seconds,
+                    stale_after=timedelta(seconds=stale_after_seconds),
+                    max_attempts=max_attempts,
+                    backoff_seconds=backoff_seconds,
                 )
+
                 if stale_count:
+                    total_stale += stale_count
                     logger.warning(
                         "Marked %d stale job(s) as failed for kind=%s (watchdog)",
                         stale_count,
                         job_kind,
                     )
 
-                # 3.2) Claim normal
+            if total_stale:
+                # Persistir alterações de status/attempts/not_before
+                uow.commit()
+
+            # 3) Scheduler: garantir jobs para suppliers (supplier_ingest)
+            if JOB_KIND_SUPPLIER_INGEST in configs:
+                created = schedule_supplier_ingest_jobs(uow, now=now)
+                if created:
+                    logger.info("Scheduled %d supplier_ingest jobs", created)
+                uow.commit()
+
+            # 4) Executar jobs para cada kind
+            for job_kind, cfg in configs.items():
+                if job_kind not in handled_kinds:
+                    continue
+
                 max_batch = max(cfg.max_concurrency, 1)
 
                 jobs = job_w.claim_pending_jobs(
@@ -113,7 +123,6 @@ async def run_worker_loop() -> None:
                     job_kind,
                 )
 
-                # Nesta primeira versão: processamento sequencial (uma por uma)
                 for job in jobs:
                     try:
                         await dispatch_job(job.job_kind, job.payload_json or "{}", uow)
@@ -121,8 +130,6 @@ async def run_worker_loop() -> None:
                         finished_at = _utcnow()
                         job_w.mark_done(job.id_job, finished_at=finished_at)
 
-                        # Lógica específica para supplier_ingest:
-                        # agendar próxima run + atualizar ingest_next_run_at
                         if job.job_kind == JOB_KIND_SUPPLIER_INGEST:
                             _schedule_next_for_supplier_after_run(
                                 uow,
@@ -135,7 +142,6 @@ async def run_worker_loop() -> None:
                             job.id_job,
                             job.job_kind,
                         )
-                        # commit por job para não acumular transações gigantes
                         uow.commit()
 
                     except Exception as err:
@@ -157,12 +163,8 @@ async def run_worker_loop() -> None:
                         )
                         uow.commit()
 
-        # 4) Esperar antes de novo ciclo (usa o menor poll_interval_seconds das configs)
-        if poll_intervals:
-            sleep_secs = min(poll_intervals)
-        else:
-            sleep_secs = 5
-
+        # 5) Sleep até próximo ciclo
+        sleep_secs = min(poll_intervals) if poll_intervals else 5
         await asyncio.sleep(sleep_secs)
 
 
@@ -173,12 +175,6 @@ def _schedule_next_for_supplier_after_run(
 ) -> None:
     """
     Depois de uma ingest, agenda a próxima run para este supplier com base no intervalo atual.
-
-    Aqui:
-    - job.payload_json tem {"id_supplier": X}
-    - calculamos finished_at + ingest_interval_minutes
-    - criamos novo job supplier_ingest com not_before=next_time
-    - atualizamos supplier.ingest_next_run_at = next_time (visibilidade)
     """
     import json
 
