@@ -9,7 +9,8 @@ from app.repositories.procurement.write.supplier_write_repo import SupplierWrite
 
 
 def execute(uow: UoW, *, id_supplier: int) -> None:
-    repo = SupplierWriteRepository(uow.db)
+    db = uow.db
+    repo = SupplierWriteRepository(db)
 
     supplier = repo.get(id_supplier)
     if not supplier:

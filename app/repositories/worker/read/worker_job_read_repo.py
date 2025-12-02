@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound
@@ -50,3 +50,37 @@ class WorkerJobReadRepository:
             .limit(1)
         )
         return self._db.execute(stmt).scalar_one_or_none() is not None
+
+    def list_jobs(
+        self,
+        *,
+        job_kind: str,
+        status: str | None = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> tuple[list[WorkerJob], int]:
+        """
+        Lista jobs com filtros por job_kind/status, ordenados por created_at desc,
+        devolvendo (rows, total).
+        """
+        if page < 1:
+            page = 1
+        if page_size < 1:
+            page_size = 1
+
+        base_stmt = select(WorkerJob)
+        if job_kind:
+            base_stmt = base_stmt.where(WorkerJob.job_kind == job_kind)
+        if status:
+            base_stmt = base_stmt.where(WorkerJob.status == status)
+
+        base_stmt = base_stmt.order_by(WorkerJob.created_at.desc())
+        count_stmt = select(func.count()).select_from(base_stmt.subquery())
+        total = int(self._db.execute(count_stmt).scalar_one() or 0)
+
+        rows = (
+            self._db.execute(base_stmt.limit(page_size).offset((page - 1) * page_size))
+            .scalars()
+            .all()
+        )
+        return rows, total

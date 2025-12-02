@@ -76,9 +76,10 @@ def _mapper_to_out(m) -> FeedMapperOut | None:
 
 
 def execute(uow: UoW, *, id_supplier: int) -> SupplierDetailOut:
-    sup_repo = SupplierReadRepository(uow.db)
-    feed_repo = SupplierFeedReadRepository(uow.db)
-    map_repo = MapperReadRepository(uow.db)
+    db = uow.db
+    sup_repo = SupplierReadRepository(db)
+    feed_repo = SupplierFeedReadRepository(db)
+    map_repo = MapperReadRepository(db)
 
     s = sup_repo.get(id_supplier)
     if not s:

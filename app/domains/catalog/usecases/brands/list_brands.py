@@ -11,5 +11,6 @@ from app.repositories.catalog.read.brand_read_repo import BrandsReadRepository
 def execute(
     uow: UoW, *, search: str | None, page: int, page_size: int
 ) -> tuple[Sequence[Brand], int]:
-    repo = BrandsReadRepository(uow.db)
+    db = uow.db
+    repo = BrandsReadRepository(db)
     return repo.list(q=search, page=page, page_size=page_size)

@@ -25,11 +25,13 @@ def execute(
     Lista eventos da fila de atualização de catálogo com paginação
     e filtro opcional por status.
     """
+    db = uow.db
+
     if status is not None and status not in ALLOWED_STATUSES:
         # manter mensagens de erro em EN
         raise InvalidArgument("Status must be one of: pending, processing, done, failed")
 
-    repo = CatalogUpdateStreamReadRepository(uow.db)
+    repo = CatalogUpdateStreamReadRepository(db)
 
     rows, total = repo.list_events(
         page=page,

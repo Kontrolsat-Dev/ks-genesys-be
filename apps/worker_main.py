@@ -185,15 +185,6 @@ def _schedule_next_for_supplier_after_run(
     job,
     finished_at: datetime,
 ) -> None:
-    """
-    Depois de uma ingest, agenda a próxima run para este supplier com base no intervalo atual.
-
-    Aqui:
-    - job.payload_json tem {"id_supplier": X}
-    - calculamos finished_at + ingest_interval_minutes
-    - criamos novo job supplier_ingest com not_before=next_time
-    - atualizamos supplier.ingest_next_run_at = next_time (visibilidade)
-    """
     import json
 
     from app.background.job_handlers import JOB_KIND_SUPPLIER_INGEST
@@ -216,6 +207,16 @@ def _schedule_next_for_supplier_after_run(
         )
         return
 
+    # ⚠️ se o supplier foi desativado para ingest, não encadear novo job
+    if not supplier.ingest_enabled:
+        supplier.ingest_next_run_at = None  # “não há próxima run agendada”
+        db.flush()
+        logger.info(
+            "Supplier %s com ingest_enabled=False – não agendo novo supplier_ingest",
+            id_supplier,
+        )
+        return
+
     interval = supplier.ingest_interval_minutes or 60
     next_time = finished_at + timedelta(minutes=interval)
 
@@ -228,7 +229,6 @@ def _schedule_next_for_supplier_after_run(
         not_before=next_time,
     )
 
-    # visibilidade apenas
     supplier.ingest_next_run_at = next_time
     db.flush()
 

@@ -18,6 +18,7 @@ from app.api.v1.suppliers import router as suppliers_router
 from app.api.v1.brands import router as brands_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.catalog_update_stream import router as catalog_updates_router
+from app.api.v1.worker_jobs import router as worker_jobs_router
 
 # Routes
 from app.api.v1.system import router as system_router
@@ -69,3 +70,4 @@ app.include_router(products_router, prefix="/api/v1")
 app.include_router(brands_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
 app.include_router(catalog_updates_router, prefix="/api/v1")
+app.include_router(worker_jobs_router, prefix="/api/v1")

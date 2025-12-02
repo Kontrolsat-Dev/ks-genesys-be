@@ -9,8 +9,9 @@ from app.infra.uow import UoW
 
 
 def execute(uow: UoW, *, id_supplier: int) -> None:
-    rread = SupplierFeedReadRepository(uow.db)
-    rwrite = SupplierFeedWriteRepository(uow.db)
+    db = uow.db
+    rread = SupplierFeedReadRepository(db)
+    rwrite = SupplierFeedWriteRepository(db)
 
     feed = rread.get_by_supplier(id_supplier)
     if not feed:

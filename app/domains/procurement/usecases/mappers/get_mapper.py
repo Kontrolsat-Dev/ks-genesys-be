@@ -8,7 +8,8 @@ from app.schemas.mappers import FeedMapperOut
 
 
 def execute(uow: UoW, *, id_feed: int) -> FeedMapperOut:
-    repo = MapperReadRepository(uow.db)
+    db = uow.db
+    repo = MapperReadRepository(db)
     e = repo.get_by_feed(id_feed)
     if not e:
         raise NotFound("Mapper not found")

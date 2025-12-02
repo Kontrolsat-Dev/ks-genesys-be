@@ -7,27 +7,21 @@ from sqlalchemy.orm import Session
 
 
 class UoW:
-    """Unit of Work simples: commands fazem commit; queries nunca."""
-
-    def __init__(self, db: Session):
-        self.db: Session = db
-        self._committed = False
+    def __init__(self, db_session: Session) -> None:
+        self.db = db_session
+        self._committed = False  # mantemos só para o __exit__
 
     def commit(self) -> None:
-        if not self._committed:
-            self.db.commit()
-            self._committed = True
+        self.db.commit()
+        self._committed = True
 
     def rollback(self) -> None:
-        if not self._committed:
-            self.db.rollback()
+        self.db.rollback()
+        self._committed = True
 
     def __enter__(self) -> UoW:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        if exc:
-            self.rollback()
-        # se não commitarem explicitamente num command, fazemos rollback para segurança
-        if not self._committed:
+        if exc or not self._committed:
             self.rollback()

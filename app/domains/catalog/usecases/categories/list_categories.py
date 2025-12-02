@@ -6,5 +6,6 @@ from app.repositories.catalog.read.category_read_repo import CategoryReadReposit
 
 
 def execute(uow: UoW, *, search: str | None, page: int, page_size: int):
-    repo = CategoryReadRepository(uow.db)
+    db = uow.db
+    repo = CategoryReadRepository(db)
     return repo.list(q=search, page=page, page_size=page_size)

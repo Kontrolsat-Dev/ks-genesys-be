@@ -47,10 +47,11 @@ def _validate(profile: dict[str, Any] | None, headers: list[str] | None) -> dict
 
 
 def execute(uow: UoW, *, id_feed: int, payload: MapperValidateIn) -> MapperValidateOut:
+    db = uow.db
     profile = payload.profile
     if profile is None:
         # usa o helper do read-repo que já te devolve dict seguro
-        repo = MapperReadRepository(uow.db)
+        repo = MapperReadRepository(db)
         profile = repo.get_by_feed(id_feed)  # {} se não existir ou se json estiver inválido
 
         if not profile:

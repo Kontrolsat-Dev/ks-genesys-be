@@ -16,7 +16,8 @@ def execute(uow: UoW, *, data: SupplierCreate) -> Supplier:
     Toda a lógica de normalização/unique fica no SupplierWriteRepository.create.
     Aqui só gerimos a transação e mapeamos erros para AppErrors.
     """
-    repo = SupplierWriteRepository(uow.db)
+    db = uow.db
+    repo = SupplierWriteRepository(db)
 
     try:
         entity = repo.create(data)

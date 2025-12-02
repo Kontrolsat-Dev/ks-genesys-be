@@ -136,10 +136,12 @@ def _upsert_mapper_for_feed(
 
 
 def execute(uow: UoW, *, id_supplier: int, payload: SupplierBundleUpdate) -> SupplierDetailOut:
-    sup_w = SupplierWriteRepository(uow.db)
-    feed_r = SupplierFeedReadRepository(uow.db)
-    feed_w = SupplierFeedWriteRepository(uow.db)
-    map_w = MapperWriteRepository(uow.db)
+    db = uow.db
+
+    sup_w = SupplierWriteRepository(db)
+    feed_r = SupplierFeedReadRepository(db)
+    feed_w = SupplierFeedWriteRepository(db)
+    map_w = MapperWriteRepository(db)
 
     try:
         # 1) Supplier (usa repo.update)

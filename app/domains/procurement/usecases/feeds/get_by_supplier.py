@@ -8,7 +8,8 @@ from app.schemas.feeds import SupplierFeedOut
 
 
 def execute(uow: UoW, *, id_supplier: int) -> SupplierFeedOut:
-    repo = SupplierFeedReadRepository(uow.db)
+    db = uow.db
+    repo = SupplierFeedReadRepository(db)
     e = repo.get_by_supplier(id_supplier)
     if not e:
         raise NotFound("Feed not found")

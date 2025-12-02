@@ -7,10 +7,11 @@ from app.schemas.products import ProductDetailOut
 
 
 def execute(uow: UoW, *, gtin: str, **kwargs) -> ProductDetailOut:
+    db = uow.db
     gtin = (gtin or "").strip()
     if not gtin:
         raise NotFound("GTIN inválido.")
-    pid = ProductsReadRepository(uow.db).get_id_by_gtin(gtin)
+    pid = ProductsReadRepository(db).get_id_by_gtin(gtin)
     if not pid:
         raise NotFound(f"Product with GTIN {gtin} not found.")
     return get_product_detail(uow, id_product=pid, opts=DetailOptions(**kwargs))

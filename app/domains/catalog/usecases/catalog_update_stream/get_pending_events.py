@@ -28,8 +28,10 @@ def execute(
     - marca-os como `processing` via write repo
     - devolve lista de CatalogUpdateEventOut
     """
-    read_repo = CatalogUpdateStreamReadRepository(uow.db)
-    write_repo = CatalogUpdateStreamWriteRepository(uow.db)
+    db = uow.db
+
+    read_repo = CatalogUpdateStreamReadRepository(db)
+    write_repo = CatalogUpdateStreamWriteRepository(db)
 
     events = read_repo.list_pending_for_claim(limit=limit, min_priority=min_priority)
 

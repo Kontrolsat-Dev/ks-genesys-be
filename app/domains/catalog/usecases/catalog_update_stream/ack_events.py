@@ -16,7 +16,8 @@ def execute(
     status: str,
     error: str | None,
 ) -> dict[str, Any]:
-    repo = CatalogUpdateStreamWriteRepository(uow.db)
+    db = uow.db
+    repo = CatalogUpdateStreamWriteRepository(db)
     updated = repo.ack_batch(ids=ids, status=status, error=error)
     uow.commit()
     return {"updated": updated}

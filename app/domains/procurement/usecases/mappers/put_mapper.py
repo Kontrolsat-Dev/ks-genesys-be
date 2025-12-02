@@ -10,15 +10,17 @@ from app.schemas.mappers import FeedMapperOut, FeedMapperUpsert
 
 
 def execute(uow: UoW, *, id_feed: int, payload: FeedMapperUpsert) -> FeedMapperOut:
+    db = uow.db
+
     if not payload or payload.profile is None or not isinstance(payload.profile, dict):
         raise InvalidArgument("Mapper profile must be a non-empty object")
 
     # garante que o feed existe
-    feed_repo = SupplierFeedReadRepository(uow.db)
+    feed_repo = SupplierFeedReadRepository(db)
     if not feed_repo.get(id_feed):
         raise NotFound("Feed not found")
 
-    repo = MapperWriteRepository(uow.db)
+    repo = MapperWriteRepository(db)
     try:
         entity = repo.upsert_profile(
             id_feed=id_feed,

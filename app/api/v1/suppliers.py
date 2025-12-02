@@ -1,4 +1,5 @@
 # app/api/v1/suppliers.py
+from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, status
