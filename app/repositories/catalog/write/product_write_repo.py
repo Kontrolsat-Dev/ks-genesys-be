@@ -30,12 +30,21 @@ class ProductWriteRepository:
     def get_by_gtin(self, gtin: str) -> Product | None:
         if not gtin:
             return None
-        return self.db.scalar(select(Product).where(Product.gtin == gtin))
+        gtin_norm = gtin.strip()
+        if not gtin_norm:
+            return None
+        return self.db.scalar(select(Product).where(Product.gtin == gtin_norm))
 
     def get_by_brand_mpn(self, id_brand: int, partnumber: str) -> Product | None:
         if not id_brand or not partnumber:
             return None
-        stmt = select(Product).where(Product.id_brand == id_brand, Product.partnumber == partnumber)
+        part_norm = partnumber.strip()
+        if not part_norm:
+            return None
+        stmt = select(Product).where(
+            Product.id_brand == id_brand,
+            Product.partnumber == part_norm,
+        )
         return self.db.scalar(stmt)
 
     # --- Escrita -------------------------------------------------
@@ -47,25 +56,68 @@ class ProductWriteRepository:
         brand_name: str | None,
         default_margin: float | None,
     ) -> Product:
-        if gtin:
-            p = self.get_by_gtin(gtin)
+        """
+        Regra:
+
+        - Se HÁ GTIN → GTIN manda em tudo:
+            * tenta get_by_gtin(gtin)
+            * se não existir → cria novo Product com esse GTIN
+            * NÃO cai para brand+mpn
+
+        - Se NÃO há GTIN → aí sim usamos brand+MPN para dedupe:
+            * cria/resolve brand por nome (BrandsWriteRepository)
+            * tenta get_by_brand_mpn(id_brand, partnumber)
+            * se não existir → cria produto sem GTIN
+
+        - Se não há GTIN nem (brand+mpn) → erro (InvalidArgument).
+        """
+
+        gtin_norm = gtin.strip() if gtin else None
+        part_norm = partnumber.strip() if partnumber else None
+        brand_norm = brand_name.strip() if brand_name else None
+
+        # 1) Caso com GTIN → só GTIN conta
+        if gtin_norm:
+            # tentar encontrar produto por GTIN
+            p = self.get_by_gtin(gtin_norm)
             if p:
                 return p
 
+            # opcionalmente ainda podemos associar brand se vier no feed
+            id_brand = None
+            if brand_norm:
+                id_brand = BrandsWriteRepository(self.db).get_or_create(brand_norm).id
+
+            p = Product(
+                gtin=gtin_norm,
+                id_brand=id_brand,
+                partnumber=part_norm,
+                margin=(default_margin or 0.0),
+            )
+            self.db.add(p)
+            self.db.flush()
+            return p
+
+        # 2) Sem GTIN → podemos usar brand+MPN como chave
         id_brand = None
-        if brand_name:
-            id_brand = BrandsWriteRepository(self.db).get_or_create(brand_name).id
+        if brand_norm:
+            id_brand = BrandsWriteRepository(self.db).get_or_create(brand_norm).id
 
-        if id_brand and partnumber:
-            p = self.get_by_brand_mpn(id_brand, partnumber)
-            if p:
-                return p
-
-        if not gtin and not (id_brand and partnumber):
+        # Sem GTIN e sem (brand+mpn) ⇒ não temos chave
+        if not (id_brand and part_norm):
             raise InvalidArgument("Missing product key (gtin or brand+mpn)")
 
+        # Tentar dedupe por brand+mpn
+        p = self.get_by_brand_mpn(id_brand, part_norm)
+        if p:
+            return p
+
+        # Criar novo produto sem GTIN (catálogo sem código de barras)
         p = Product(
-            gtin=gtin, id_brand=id_brand, partnumber=partnumber, margin=(default_margin or 0.0)
+            gtin=None,
+            id_brand=id_brand,
+            partnumber=part_norm,
+            margin=(default_margin or 0.0),
         )
         self.db.add(p)
         self.db.flush()
@@ -106,7 +158,8 @@ class ProductWriteRepository:
     def add_meta_if_missing(self, id_product: int, *, name: str, value: str) -> tuple[bool, bool]:
         row = self.db.scalar(
             select(ProductMeta).where(
-                ProductMeta.id_product == id_product, ProductMeta.name == name
+                ProductMeta.id_product == id_product,
+                ProductMeta.name == name,
             )
         )
         if row is None:

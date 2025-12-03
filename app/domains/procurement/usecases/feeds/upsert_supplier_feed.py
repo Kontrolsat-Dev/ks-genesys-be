@@ -10,9 +10,9 @@ from app.schemas.feeds import SupplierFeedCreate, SupplierFeedUpdate, SupplierFe
 def execute(
     uow: UoW, *, id_supplier: int, data: SupplierFeedCreate | SupplierFeedUpdate
 ) -> SupplierFeedOut:
-    def mutate(e):
-        db = uow.db
+    db = uow.db
 
+    def mutate(e):
         for f in ("kind", "format", "url", "active", "csv_delimiter"):
             v = getattr(data, f, None)
             if v is not None:
@@ -34,7 +34,7 @@ def execute(
         if getattr(data, "auth", None) is not None:
             e.auth_json = None if data.auth is None else json.dumps(data.auth, ensure_ascii=False)
 
-        repo = SupplierFeedWriteRepository(db)
-        entity = repo.upsert_for_supplier(id_supplier, mutate)
-        uow.commit()
-        return SupplierFeedOut.from_entity(entity)
+    repo = SupplierFeedWriteRepository(db)
+    entity = repo.upsert_for_supplier(id_supplier, mutate)
+    uow.commit()
+    return SupplierFeedOut.from_entity(entity)

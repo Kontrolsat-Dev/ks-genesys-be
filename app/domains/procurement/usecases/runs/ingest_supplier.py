@@ -24,9 +24,7 @@ from app.repositories.procurement.read.supplier_feed_read_repo import (
     SupplierFeedReadRepository,
 )
 from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
-from app.repositories.procurement.write.feed_run_write_repo import (
-    FeedRunWriteRepository,
-)
+from app.repositories.procurement.write.feed_run_write_repo import FeedRunWriteRepository
 from app.repositories.procurement.write.product_event_write_repo import (
     ProductEventWriteRepository,
 )
@@ -80,6 +78,7 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
 
     run = run_w.start(id_feed=feed.id)
     id_run = run.id
+    uow.commit()
 
     log.info(
         "[run=%s] start ingest id_supplier=%s id_feed=%s format=%s url=%s",
