@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="genesys@localhost" uuid="163045bb-06dd-4c4d-848d-cfaf772c5a20">
+    <data-source source="LOCAL" name="Genesys@localhost" uuid="163045bb-06dd-4c4d-848d-cfaf772c5a20">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
-      <jdbc-url>jdbc:postgresql://localhost:5432/genesys</jdbc-url>
+      <jdbc-url>jdbc:postgresql://localhost:5432/Genesys</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>

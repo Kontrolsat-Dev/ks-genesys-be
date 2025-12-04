@@ -51,17 +51,21 @@ class Product(Base):
     )
 
     __table_args__ = (
+        # 1) GTIN único quando não é NULL
         Index(
             "uq_products_gtin_not_null",
             "gtin",
             unique=True,
             postgresql_where=text("gtin IS NOT NULL"),
         ),
+        # 2) brand+MPN únicos **apenas** quando NÃO há GTIN
         Index(
             "uq_products_brand_mpn",
             "id_brand",
             "partnumber",
             unique=True,
-            postgresql_where=text("id_brand IS NOT NULL AND partnumber IS NOT NULL"),
+            postgresql_where=text(
+                "gtin IS NULL AND id_brand IS NOT NULL AND partnumber IS NOT NULL"
+            ),
         ),
     )
