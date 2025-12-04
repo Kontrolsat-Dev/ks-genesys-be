@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
 from datetime import datetime
 
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
 from app.background.job_handlers import JOB_KIND_SUPPLIER_INGEST
+from app.infra.base import utcnow
 from app.infra.uow import UoW
 from app.models.supplier import Supplier
 from app.repositories.worker.read.worker_job_read_repo import WorkerJobReadRepository
@@ -68,3 +70,16 @@ def schedule_supplier_ingest_jobs(uow: UoW, *, now: datetime) -> int:
         )
 
     return created
+
+
+def execute(uow: UoW, *, now: datetime | None = None) -> dict[str, Any]:
+    """
+    Wrapper "standard" para ser usado pela API ou pelo scheduler.
+    """
+    current = now or utcnow()
+    created = schedule_supplier_ingest_jobs(uow, now=current)
+    uow.commit()
+    return {
+        "jobs_created": created,
+        "scheduled_at": current,  # pode ser datetime à vontade
+    }
