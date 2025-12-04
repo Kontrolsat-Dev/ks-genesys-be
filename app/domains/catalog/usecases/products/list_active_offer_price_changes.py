@@ -122,8 +122,8 @@ def execute(
             ProductPriceChangeOut(
                 id_product=id_product,
                 name=row.get("name") or "",
-                brand_name=row.get("brand_name"),
-                category_name=row.get("category_name"),
+                brand_name=row.get("brand_name") or "",
+                category_name=row.get("category_name") or "",
                 current_price=new_price,
                 previous_price=old_price,
                 delta_abs=delta_abs,

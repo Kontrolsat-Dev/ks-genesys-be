@@ -15,16 +15,9 @@ from app.models.category import Category as C
 from app.models.supplier import Supplier as S
 from app.models.product_supplier_event import ProductSupplierEvent as PSE
 from app.schemas.products import ProductPriceChangeOut, ProductPriceChangeListOut
+from app.core.normalize import to_decimal
 
 Direction = Literal["up", "down", "both"]
-
-
-def _to_decimal(value: Any) -> Decimal:
-    if isinstance(value, Decimal):
-        return value
-    if value is None:
-        return Decimal("0")
-    return Decimal(str(value))
 
 
 def execute(
@@ -110,10 +103,10 @@ def execute(
         if old_evt is None:
             continue
 
-        new_cost = _to_decimal(new_evt["price"])
-        old_cost = _to_decimal(old_evt["price"])
+        new_cost = to_decimal(new_evt["price"])
+        old_cost = to_decimal(old_evt["price"])
 
-        margin = _to_decimal(new_evt.get("margin"))
+        margin = to_decimal(new_evt.get("margin"))
         factor = Decimal("1") + (margin / Decimal("100"))
 
         new_price = (new_cost * factor).quantize(Decimal("0.01"))
@@ -146,8 +139,8 @@ def execute(
             ProductPriceChangeOut(
                 id_product=id_product,
                 name=new_evt["product_name"] or "",
-                brand_name=new_evt.get("brand_name"),
-                category_name=new_evt.get("category_name"),
+                brand_name=new_evt.get("brand_name") or "",
+                category_name=new_evt.get("category_name") or "",
                 current_price=new_price,
                 previous_price=old_price,
                 delta_abs=delta_abs,

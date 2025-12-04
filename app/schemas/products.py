@@ -129,15 +129,15 @@ class ProductMarginUpdate(BaseModel):
 
 class ProductPriceChangeOut(BaseModel):
     id_product: int
-    name: str
-    brand_name: str
-    category_name: str
+    name: str | None
+    brand_name: str | None
+    category_name: str | None
 
     current_price: Decimal
     previous_price: Decimal
     delta_abs: Decimal
     delta_pct: Decimal
-    direction: Literal["up", "down"]
+    direction: Literal["up", "down", "both"]
 
     updated_at: datetime
 
