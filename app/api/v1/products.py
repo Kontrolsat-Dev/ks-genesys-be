@@ -23,9 +23,13 @@ from app.domains.catalog.usecases.products.list_active_offer_price_changes impor
 from app.domains.catalog.usecases.products.list_catalog_price_changes import (
     execute as uc_list_catalog_price_changes,
 )
+from app.domains.catalog.usecases.products.get_product_facets import (
+    execute as uc_get_product_facets,
+)
 from app.infra.uow import UoW
 from app.schemas.products import (
     ProductDetailOut,
+    ProductFacetsOut,
     ProductListOut,
     ProductMarginUpdate,
     ProductPriceChangeListOut,
@@ -76,6 +80,57 @@ def list_products(
         id_supplier=id_supplier,
         sort=sort,
         expand_offers=expand_offers,
+    )
+
+
+@router.get(
+    "/facets",
+    response_model=ProductFacetsOut,
+    summary="Obter facets (marcas/categorias/fornecedores) válidos para os filtros atuais",
+)
+def get_product_facets(
+    uow: UowDep,
+    q: str | None = Query(None),
+    gtin: str | None = Query(None),
+    partnumber: str | None = Query(None),
+    id_brand: int | None = Query(None, description="Filtrar inicialmente por id_brand (opcional)"),
+    brand: str | None = Query(
+        None, description="Filtrar inicialmente por nome de marca (opcional)"
+    ),
+    id_category: int | None = Query(
+        None, description="Filtrar inicialmente por id_category (opcional)"
+    ),
+    category: str | None = Query(
+        None, description="Filtrar inicialmente por nome de categoria (opcional)"
+    ),
+    has_stock: bool | None = Query(
+        None,
+        description="true=apenas produtos com stock; false=apenas sem stock; omitido=todos",
+    ),
+    id_supplier: int | None = Query(
+        None,
+        description="Filtrar inicialmente por supplier (opcional)",
+    ),
+) -> ProductFacetsOut:
+    """
+    Devolve listas de IDs (brand_ids, category_ids, supplier_ids) que têm pelo menos
+    um produto compatível com os filtros fornecidos.
+
+    Para cada facet, o cálculo ignora o filtro dessa própria dimensão
+    (ex.: para calcular brand_ids, é ignorado id_brand/brand), mas respeita
+    os restantes filtros (q, categoria, supplier, stock, ...).
+    """
+    return uc_get_product_facets(
+        uow,
+        q=q,
+        gtin=gtin,
+        partnumber=partnumber,
+        id_brand=id_brand,
+        brand=brand,
+        id_category=id_category,
+        category=category,
+        has_stock=has_stock,
+        id_supplier=id_supplier,
     )
 
 

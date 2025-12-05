@@ -147,3 +147,16 @@ class ProductPriceChangeListOut(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ----------- FACETES ---------------
+class ProductFacetsOut(BaseModel):
+    """
+    Facets para filtros de produtos.
+    Cada lista contem **IDs** válidos para a dimensão correspondente,
+    já respeitando os filtros atuais.
+    """
+
+    brand_ids: list[int] = Field(default_factory=list)
+    category_ids: list[int] = Field(default_factory=list)
+    supplier_ids: list[int] = Field(default_factory=list)
