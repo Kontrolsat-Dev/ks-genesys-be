@@ -31,35 +31,22 @@ class ProductsReadRepository:
     def get_by_brand_mpn(self, id_brand: int, partnumber: str) -> Product | None:
         if not id_brand or not partnumber:
             return None
-        stmt = select(Product).where(Product.id_brand == id_brand, Product.partnumber == partnumber)
+        stmt = select(Product).where(
+            Product.id_brand == id_brand,
+            Product.partnumber == partnumber,
+        )
         return self.db.scalar(stmt)
 
-    # Lista paginada com filtros/sort ----------------------------
-    def list_products(
-        self,
-        *,
-        page: int = 1,
-        page_size: int = 20,
-        q: str | None = None,
-        gtin: str | None = None,
-        partnumber: str | None = None,
-        id_brand: int | None = None,
-        brand: str | None = None,
-        id_category: int | None = None,
-        category: str | None = None,
-        has_stock: bool | None = None,
-        id_supplier: int | None = None,
-        sort: str = "recent",  # "recent" | "name" | "cheapest"
-    ):
-        page = max(1, page)
-        page_size = max(1, min(page_size, 100))
+    # Helpers internos --------------------------------------------
 
+    def _base_query(self):
+        """
+        Query base (sem filtros nem ordenação) já com joins a Brand/Category.
+        """
         b = aliased(Brand)
         c = aliased(Category)
-        si = aliased(SupplierItem)
-        sf = aliased(SupplierFeed)
 
-        base = (
+        stmt = (
             select(
                 Product.id,
                 Product.gtin,
@@ -80,6 +67,31 @@ class ProductsReadRepository:
             .join(b, b.id == Product.id_brand, isouter=True)
             .join(c, c.id == Product.id_category, isouter=True)
         )
+
+        return stmt, b, c
+
+    def _apply_filters(
+        self,
+        stmt,
+        *,
+        b,
+        c,
+        q: str | None = None,
+        gtin: str | None = None,
+        partnumber: str | None = None,
+        id_brand: int | None = None,
+        brand: str | None = None,
+        id_category: int | None = None,
+        category: str | None = None,
+        has_stock: bool | None = None,
+        id_supplier: int | None = None,
+    ):
+        """
+        Aplica os filtros comuns (q, gtin, brand, category, stock, supplier)
+        sobre um statement que já tenha joins a Brand/Category.
+        """
+        si = aliased(SupplierItem)
+        sf = aliased(SupplierFeed)
 
         filters: list = []
 
@@ -116,61 +128,231 @@ class ProductsReadRepository:
             )
 
         if has_stock is True:
-            # existe pelo menos uma oferta com stock>0 para este produto
             exists_stock = exists(
-                select(si.id).where(and_(si.id_product == Product.id, si.stock > 0))
+                select(si.id).where(
+                    and_(
+                        si.id_product == Product.id,
+                        si.stock > 0,
+                    )
+                )
             )
             filters.append(exists_stock)
         elif has_stock is False:
-            # não existe nenhuma oferta com stock>0
             not_exists_stock = ~exists(
-                select(si.id).where(and_(si.id_product == Product.id, si.stock > 0))
+                select(si.id).where(
+                    and_(
+                        si.id_product == Product.id,
+                        si.stock > 0,
+                    )
+                )
             )
             filters.append(not_exists_stock)
 
         if id_supplier:
-            # existe pelo menos uma oferta deste supplier (com qualquer stock)
             exists_supplier_offer = exists(
                 select(si.id)
                 .join(sf, sf.id == si.id_feed)
-                .where(and_(si.id_product == Product.id, sf.id_supplier == id_supplier))
+                .where(
+                    and_(
+                        si.id_product == Product.id,
+                        sf.id_supplier == id_supplier,
+                    )
+                )
             )
             filters.append(exists_supplier_offer)
 
         if filters:
-            base = base.where(and_(*filters))
+            stmt = stmt.where(and_(*filters))
+
+        return stmt
+
+    # Lista paginada com filtros/sort ----------------------------
+
+    def list_products(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        q: str | None = None,
+        gtin: str | None = None,
+        partnumber: str | None = None,
+        id_brand: int | None = None,
+        brand: str | None = None,
+        id_category: int | None = None,
+        category: str | None = None,
+        has_stock: bool | None = None,
+        id_supplier: int | None = None,
+        sort: str = "recent",  # "recent" | "name" | "cheapest"
+    ):
+        page = max(1, page)
+        page_size = max(1, min(page_size, 100))
+
+        stmt, b, c = self._base_query()
+        stmt = self._apply_filters(
+            stmt,
+            b=b,
+            c=c,
+            q=q,
+            gtin=gtin,
+            partnumber=partnumber,
+            id_brand=id_brand,
+            brand=brand,
+            id_category=id_category,
+            category=category,
+            has_stock=has_stock,
+            id_supplier=id_supplier,
+        )
+
+        si = aliased(SupplierItem)
+        sf = aliased(SupplierFeed)
 
         # Ordenação
         if sort == "name":
-            base = base.order_by(Product.name.asc().nulls_last(), Product.id.asc())
+            stmt = stmt.order_by(Product.name.asc().nulls_last(), Product.id.asc())
         elif sort == "cheapest":
             # menor preço entre ofertas com stock>0; NULLS LAST
             min_price_with_stock = (
                 select(func.min(si.price))
                 .select_from(si)
                 .join(sf, sf.id == si.id_feed)
-                .where(and_(si.id_product == Product.id, si.stock > 0, si.price.isnot(None)))
+                .where(
+                    and_(
+                        si.id_product == Product.id,
+                        si.stock > 0,
+                        si.price.isnot(None),
+                    )
+                )
                 .correlate(Product)
                 .scalar_subquery()
             )
-            base = base.order_by(
+            stmt = stmt.order_by(
                 min_price_with_stock.is_(None),
                 min_price_with_stock.asc(),
                 Product.id.asc(),
             )
         else:
             # recent: updated_at DESC, depois created_at DESC
-            base = base.order_by(
+            stmt = stmt.order_by(
                 Product.updated_at.desc().nulls_last(),
                 Product.created_at.desc(),
                 Product.id.desc(),
             )
 
-        total = self.db.scalar(select(func.count()).select_from(base.subquery())) or 0
-        rows = self.db.execute(base.limit(page_size).offset((page - 1) * page_size)).all()
+        total = self.db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+
+        rows = self.db.execute(stmt.limit(page_size).offset((page - 1) * page_size)).all()
+
         return rows, int(total)
 
-    # Dados de produto individual
+    # Facets ------------------------------------------------------
+
+    def get_facets(
+        self,
+        *,
+        q: str | None = None,
+        gtin: str | None = None,
+        partnumber: str | None = None,
+        id_brand: int | None = None,
+        brand: str | None = None,
+        id_category: int | None = None,
+        category: str | None = None,
+        has_stock: bool | None = None,
+        id_supplier: int | None = None,
+    ) -> tuple[list[int], list[int], list[int]]:
+        """
+        Devolve (brand_ids, category_ids, supplier_ids) válidos para os filtros.
+
+        Regra:
+        - Para calcular cada facet, ignoramos o filtro **dessa própria dimensão**,
+          mas mantemos os restantes (q, has_stock, etc.), para poderes trocar
+          de marca/categoria/fornecedor sem ficares “preso”.
+        """
+
+        # --- BRANDS (ignora filtro de brand) ---
+        stmt_b, b_b, c_b = self._base_query()
+        stmt_b = self._apply_filters(
+            stmt_b,
+            b=b_b,
+            c=c_b,
+            q=q,
+            gtin=gtin,
+            partnumber=partnumber,
+            id_brand=None,
+            brand=None,
+            id_category=id_category,
+            category=category,
+            has_stock=has_stock,
+            id_supplier=id_supplier,
+        )
+        sub_b = stmt_b.subquery()
+        stmt_brand_ids = (
+            select(sub_b.c.id_brand)
+            .where(sub_b.c.id_brand.isnot(None))
+            .distinct()
+            .order_by(sub_b.c.id_brand)
+        )
+        brand_ids = [row[0] for row in self.db.execute(stmt_brand_ids).all()]
+
+        # --- CATEGORIES (ignora filtro de category) ---
+        stmt_c, b_c, c_c = self._base_query()
+        stmt_c = self._apply_filters(
+            stmt_c,
+            b=b_c,
+            c=c_c,
+            q=q,
+            gtin=gtin,
+            partnumber=partnumber,
+            id_brand=id_brand,
+            brand=brand,
+            id_category=None,
+            category=None,
+            has_stock=has_stock,
+            id_supplier=id_supplier,
+        )
+        sub_c = stmt_c.subquery()
+        stmt_category_ids = (
+            select(sub_c.c.id_category)
+            .where(sub_c.c.id_category.isnot(None))
+            .distinct()
+            .order_by(sub_c.c.id_category)
+        )
+        category_ids = [row[0] for row in self.db.execute(stmt_category_ids).all()]
+
+        # --- SUPPLIERS (ignora filtro de supplier) ---
+        stmt_s, b_s, c_s = self._base_query()
+        stmt_s = self._apply_filters(
+            stmt_s,
+            b=b_s,
+            c=c_s,
+            q=q,
+            gtin=gtin,
+            partnumber=partnumber,
+            id_brand=id_brand,
+            brand=brand,
+            id_category=id_category,
+            category=category,
+            has_stock=has_stock,
+            id_supplier=None,
+        )
+        sub_s = stmt_s.subquery()
+
+        si = aliased(SupplierItem)
+        sf = aliased(SupplierFeed)
+
+        stmt_supplier_ids = (
+            select(sf.id_supplier)
+            .select_from(si)
+            .join(sf, sf.id == si.id_feed)
+            .join(sub_s, sub_s.c.id == si.id_product)
+            .distinct()
+            .order_by(sf.id_supplier)
+        )
+        supplier_ids = [row[0] for row in self.db.execute(stmt_supplier_ids).all()]
+
+        return brand_ids, category_ids, supplier_ids
+
+    # Dados de produto individual -------------------------------
+
     def get_product_with_names(self, id_product: int):
         b = aliased(Brand)
         c = aliased(Category)
@@ -200,19 +382,13 @@ class ProductsReadRepository:
         row = self.db.execute(stmt).first()
         return row
 
-    # Produto atraves de gtin
     def get_id_by_gtin(self, gtin: str) -> int | None:
         if not gtin:
             return None
         stmt = select(Product.id).where(Product.gtin == gtin)
         return self.db.scalar(stmt)
 
-    # Margem de produto
     def get_product_margin(self, id_product: int) -> float:
-        """
-        Devolve a margin do produto como float normalizado (>= 0).
-        Se não houver produto ou margin inválida, devolve 0.0.
-        """
         if not id_product:
             return 0.0
 
@@ -227,8 +403,5 @@ class ProductsReadRepository:
 
         if margin < 0:
             margin = 0.0
-
-        # Se quiseres, podes meter um clamp aqui, ex:
-        # if margin > 5: margin = 5.0
 
         return margin

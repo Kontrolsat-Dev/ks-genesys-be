@@ -68,6 +68,7 @@ Backend
 │  │  │  │  ├─ products
 │  │  │  │  │  ├─ get_product_by_gtin.py
 │  │  │  │  │  ├─ get_product_detail.py
+│  │  │  │  │  ├─ get_product_facets.py
 │  │  │  │  │  ├─ list_active_offer_price_changes.py
 │  │  │  │  │  ├─ list_catalog_price_changes.py
 │  │  │  │  │  ├─ list_products.py
@@ -212,12 +213,10 @@ Backend
 │  │  ├─ jwt.py
 │  │  └─ __init__.py
 │  └─ __init__.py
-├─ app.zip
 ├─ apps
 │  ├─ api_main.py
 │  ├─ worker_main.py
 │  └─ __init__.py
-├─ backend.zip
 ├─ docs
 │  ├─ docs.md
 │  └─ elektro3_mapper.json
@@ -225,6 +224,7 @@ Backend
 ├─ pyproject.toml
 ├─ README.md
 ├─ requirements.txt
-└─ requirements.zip
+└─ seeder
+   └─ suppliers.sql
 
 ```
