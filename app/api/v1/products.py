@@ -193,9 +193,9 @@ def get_product_detail_by_gtin(
     response_model=ProductDetailOut,
 )
 def update_product_margin(
+    uow: UowDep,
     id_product: int = Path(..., ge=1),
     payload: ProductMarginUpdate = ...,
-    uow: UowDep = None,
     expand_meta: bool = Query(True),
     expand_offers: bool = Query(True),
     expand_events: bool = Query(True),

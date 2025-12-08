@@ -22,6 +22,7 @@ from app.schemas.mappers import (
     MapperValidateOut,
     FeedMapperOut,
     FeedMapperUpsert,
+    MappingOpsOut,
 )
 
 router = APIRouter(
@@ -70,6 +71,7 @@ def upsert_mapper_for_feed(
 
 @router.get(
     "/ops",
+    response_model=MappingOpsOut,
 )
-def list_ops():
-    return supported_ops_for_api()
+def list_ops() -> MappingOpsOut:
+    return MappingOpsOut(ops=supported_ops_for_api())

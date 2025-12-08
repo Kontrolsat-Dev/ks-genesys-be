@@ -15,7 +15,7 @@ UowDep = Annotated[UoW, Depends(get_uow)]
 @router.post("/supplier/{id_supplier}/ingest")
 async def ingest_supplier(
     id_supplier: int,
+    uow: UowDep,
     limit: int | None = Query(default=None, ge=1, le=1_000_000),
-    uow: UowDep = None,
 ):
     return await uc_ingest(uow, id_supplier=id_supplier, limit=limit)
