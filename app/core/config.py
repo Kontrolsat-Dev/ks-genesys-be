@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     FEED_DOWNLOAD_TIMEOUT: int = 60
     # Prestashop
     PS_AUTH_VALIDATE_URL: str
+    PS_CATEGORIES_URL: str
     PS_GENESYS_KEY: str
     PS_AUTH_VALIDATE_HEADER: str = "X-Genesys-Key"
     PS_USER_AGENT: str = "genesys/2.0"

@@ -6,5 +6,5 @@ AuthFn = Callable[[str, str], dict[str, Any]]
 UpdateFn = Callable[[int, int], dict[str, Any]]
 
 
-def get_auth_login() -> AuthFn:
-    return PrestashopClient().login  # stateless por chamada
+def get_prestashop_client() -> PrestashopClient:
+    return PrestashopClient()

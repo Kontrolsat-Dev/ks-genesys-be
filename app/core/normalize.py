@@ -227,6 +227,30 @@ def normalize_simple(text: str | None, max_len: int = 120) -> str | None:
     return (s[:max_len]).strip() or None
 
 
+def normalize_category(raw: str | None, max_len: int = 120) -> str | None:
+    """
+    Normaliza uma categoria vinda do fornecedor.
+
+    Regras:
+    - Separar "->"
+    - Ignora segmentos vazios
+    - Usa APENAS o último segmento (categoria principal)
+    - Aplica normalize_simple a esse segmento
+
+    Exemplos:
+      "->DESCONTINUADOS->DIVERSOS"        → "Diversos"
+      "Brinquedos->Bonecas->Harry Potter" → "Harry Potter"
+      "Televisão"                         → "Televisão"
+    """
+    if not raw:
+        return None
+
+    segments = [s.strip() for s in raw.split("->") if s.strip()]
+    if not segments:
+        return None
+    return normalize_simple(segments[-1], max_len)
+
+
 def normalize_key_ci(text: str | None, max_len: int = 120) -> str | None:
     """Para LOOKUP/DEDUPE: aplica normalize_simple + lower(). NÃO guardar na BD."""
     s = normalize_simple(text, max_len)

@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 from typing import Any
 
 from app.core.errors import InvalidArgument
-from app.core.normalize import normalize_images, normalize_simple, to_int, to_decimal_str
+from app.core.normalize import (
+    normalize_images,
+    normalize_simple,
+    to_int,
+    to_decimal_str,
+    normalize_category,
+)
 from app.domains.mapping.engine import IngestEngine
 from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
 from app.repositories.procurement.write.product_event_write_repo import (
@@ -108,7 +114,7 @@ def process_row(
     raw_category_name = mapped.get("category") or None
 
     brand_name = normalize_simple(raw_brand_name) if raw_brand_name else None
-    category_name = normalize_simple(raw_category_name) if raw_category_name else None
+    category_name = normalize_category(raw_category_name) if raw_category_name else None
 
     changed = 0
 

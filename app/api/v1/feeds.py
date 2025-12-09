@@ -6,8 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.core.deps import get_uow, require_access_token
-from app.core.deps.providers import get_feed_preview
+from app.core.deps import get_uow, require_access_token, get_feed_downloader
 from app.domains.procurement.usecases.feeds.delete_supplier_feed import (
     execute as uc_delete,
 )
@@ -18,6 +17,7 @@ from app.domains.procurement.usecases.feeds.test_feed import execute as uc_test
 from app.domains.procurement.usecases.feeds.upsert_supplier_feed import (
     execute as uc_upsert,
 )
+from app.external.feed_downloader import FeedDownloader
 from app.infra.uow import UoW
 from app.schemas.feeds import (
     FeedTestRequest,
@@ -74,5 +74,9 @@ def delete_supplier_feed(
     "/test",
     response_model=FeedTestResponse,
 )
-async def test_feed(*, payload: FeedTestRequest, preview=Depends(get_feed_preview)):
-    return await uc_test(payload, preview_feed=preview)
+async def test_feed(
+    *,
+    payload: FeedTestRequest,
+    downloader: FeedDownloader = Depends(get_feed_downloader),
+):
+    return await uc_test(payload, preview_feed=downloader.preview)

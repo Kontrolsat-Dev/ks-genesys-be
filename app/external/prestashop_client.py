@@ -36,6 +36,7 @@ class PrestashopClient:
 
     def __init__(self) -> None:
         self.validate_url: str | None = getattr(settings, "PS_AUTH_VALIDATE_URL", None)
+        self.categories_url: str | None = getattr(settings, "PS_CATEGORIES_URL", None)
         self.header_name: str | None = getattr(settings, "PS_AUTH_VALIDATE_HEADER", None)
         self.genesys_key: str | None = getattr(settings, "PS_GENESYS_KEY", None)
 
@@ -71,15 +72,6 @@ class PrestashopClient:
             "Content-Type": "application/json",
             "Connection": "close",  # stateless: close TCP after response
         }
-
-        # OPTIONAL: propagate request id to Prestashop (uncomment if you expose it)
-        # try:
-        #     from app.core.middleware import request_id_var
-        #     rid = request_id_var.get(None)
-        #     if rid:
-        #         headers["X-Request-ID"] = str(rid)
-        # except Exception:
-        #     pass
 
         payload = {"email": email, "password": password}
         url = self.validate_url
@@ -189,4 +181,148 @@ class PrestashopClient:
                 raise
 
         # safeguard
+        raise last_exc or RuntimeError("upstream_unknown")
+
+    def get_categories(self) -> list[dict[str, Any]]:
+        """
+        Vai buscar as categorias do Prestashop via r_genesys.
+
+        - Usa o mesmo header de validação (self.header_name + self.genesys_key)
+        - Usa GET em vez de POST
+        - Aplica o mesmo esquema de retry
+        - Normaliza a resposta para uma lista de dicts
+        """
+        if not self.categories_url:
+            # se não configuraste explicitamente, faz fallback (por ex. em dev)
+            url = self.validate_url
+        else:
+            url = self.categories_url
+
+        headers = {
+            self.header_name: self.genesys_key,  # value not logged
+            "User-Agent": self.user_agent,
+            "Accept": "application/json",
+            "Connection": "close",  # stateless: close TCP after response
+        }
+
+        last_exc: Exception | None = None
+        for attempt in range(self.retry_attempts + 1):
+            start = time.perf_counter()
+            try:
+                log.debug(
+                    "ps.categories GET start attempt=%d url=%s",
+                    attempt + 1,
+                    url,
+                )
+
+                resp = requests.get(
+                    url,
+                    headers=headers,
+                    timeout=self.timeout,
+                    verify=self.verify,
+                )
+                dur_ms = (time.perf_counter() - start) * 1000.0
+
+                sc = resp.status_code
+                ctype = resp.headers.get("Content-Type")
+                clen = _len_bytes(resp.content)
+
+                log.info(
+                    "ps.categories GET done status=%s dur=%.1fms ctype=%s len=%d attempt=%d",
+                    sc,
+                    dur_ms,
+                    ctype,
+                    clen,
+                    attempt + 1,
+                )
+
+                if 200 <= sc < 300:
+                    # parse json rigidamente
+                    try:
+                        data = resp.json() if resp.content else []
+                    except Exception as parse_err:
+                        log.warning(
+                            "ps.categories json_parse_error dur=%.1fms len=%d attempt=%d",
+                            dur_ms,
+                            clen,
+                            attempt + 1,
+                        )
+                        raise RuntimeError("upstream_invalid_json") from parse_err
+
+                    # Normalizar em lista de categorias
+                    categories: Any = data
+                    if isinstance(data, dict):
+                        # alguns endpoints usam { "categories": [...] } ou { "items": [...] }
+                        if isinstance(data.get("categories"), list):
+                            categories = data["categories"]
+                        elif isinstance(data.get("items"), list):
+                            categories = data["items"]
+
+                    if not isinstance(categories, list):
+                        log.warning(
+                            "ps.categories invalid_payload_type type=%s",
+                            type(categories).__name__,
+                        )
+                        raise RuntimeError("invalid_categories_payload")
+
+                    # garantimos que é lista de dicts
+                    normalized: list[dict[str, Any]] = []
+                    for c in categories:
+                        if isinstance(c, dict):
+                            normalized.append(c)
+                        else:
+                            normalized.append({"value": c})
+
+                    return normalized
+
+                if sc in (401, 403):
+                    log.warning(
+                        "ps.categories unauthorized status=%s dur=%.1fms attempt=%d",
+                        sc,
+                        dur_ms,
+                        attempt + 1,
+                    )
+                    raise RuntimeError(f"auth_failed:{sc}")
+
+                if 500 <= sc < 600:
+                    log.warning(
+                        "ps.categories upstream_5xx status=%s dur=%.1fms attempt=%d will_retry=%s",
+                        sc,
+                        dur_ms,
+                        attempt + 1,
+                        attempt < self.retry_attempts,
+                    )
+                    raise RuntimeError(f"upstream_5xx:{sc}")
+
+                log.warning(
+                    "ps.categories upstream_http status=%s dur=%.1fms attempt=%d",
+                    sc,
+                    dur_ms,
+                    attempt + 1,
+                )
+                raise RuntimeError(f"upstream_http:{sc}")
+
+            except (ConnectTimeout, ReadTimeout, Timeout, ConnErr) as e:
+                last_exc = e
+                dur_ms = (time.perf_counter() - start) * 1000.0
+                will_retry = attempt < self.retry_attempts
+                log.warning(
+                    "ps.categories network_error=%s dur=%.1fms attempt=%d will_retry=%s",
+                    e.__class__.__name__,
+                    dur_ms,
+                    attempt + 1,
+                    will_retry,
+                )
+                if will_retry:
+                    time.sleep(self.retry_backoff * (2**attempt))
+                    continue
+                raise RuntimeError("upstream_timeout") from e
+
+            except RuntimeError as e:
+                last_exc = e
+                if str(e).startswith("upstream_5xx:") and attempt < self.retry_attempts:
+                    time.sleep(self.retry_backoff * (2**attempt))
+                    continue
+                raise
+
         raise last_exc or RuntimeError("upstream_unknown")
