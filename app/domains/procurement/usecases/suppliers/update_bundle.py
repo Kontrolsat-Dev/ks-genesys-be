@@ -136,6 +136,15 @@ def _upsert_mapper_for_feed(
 
 
 def execute(uow: UoW, *, id_supplier: int, payload: SupplierBundleUpdate) -> SupplierDetailOut:
+    """
+    Atualiza supplier, feed e mapper num único bundle atómico.
+
+    Nota arquitetural:
+    Este UseCase (escrita) invoca `get_supplier_detail` (leitura) no final para
+    devolver o objeto atualizado. Em CQRS puro, o write devolveria apenas o ID
+    e o frontend faria GET separado. Optámos por devolver o objeto completo
+    para melhor UX (menos round-trips).
+    """
     db = uow.db
 
     sup_w = SupplierWriteRepository(db)

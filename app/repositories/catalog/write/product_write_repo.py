@@ -23,7 +23,9 @@ class ProductWriteRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    # --- Lookups mínimos usados por writes (opcional) ------------
+    # --- Lookups auxiliares para writes (CQRS pragmático) ----------
+    # Usados internamente antes de operações de escrita.
+    # Para queries ricas de leitura, usar ProductsReadRepository.
     def get(self, id_product: int) -> Product | None:
         return self.db.get(Product, id_product)
 

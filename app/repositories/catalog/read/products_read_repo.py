@@ -55,6 +55,7 @@ class ProductsReadRepository:
                 Product.id_category,
                 Product.partnumber,
                 Product.name,
+                Product.margin,
                 Product.description,
                 Product.image_url,
                 Product.weight_str,
@@ -389,6 +390,14 @@ class ProductsReadRepository:
         return self.db.scalar(stmt)
 
     def get_product_margin(self, id_product: int) -> float:
+        """
+        Devolve a margem do produto.
+
+        Nota: Retorna 0.0 se margin for NULL. Na prática, isto não acontece
+        porque produtos só são criados via ingest e herdam a margem do supplier.
+        Não há criação manual de produtos — o Genesys trata apenas produtos
+        de fornecedores.
+        """
         if not id_product:
             return 0.0
 

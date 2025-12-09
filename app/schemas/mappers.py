@@ -52,3 +52,18 @@ class MapperValidateOut(BaseModel):
     warnings: list[dict[str, Any]]
     required_coverage: dict[str, Any]
     headers_checked: bool
+
+
+class MappingOpOut(BaseModel):
+    """Operação suportada pelo motor de mapeamento."""
+
+    op: str
+    label: str
+    arity: int
+    input: str
+
+
+class MappingOpsOut(BaseModel):
+    """Lista de operações suportadas para condições no mapper."""
+
+    ops: list[MappingOpOut]

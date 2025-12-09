@@ -39,17 +39,17 @@ UowDep = Annotated[UoW, Depends(get_uow)]
 
 @router.get("", response_model=SupplierList)
 def list_suppliers(
+    uow: UowDep,
     search: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    uow: UowDep = None,
 ):
     items, total = uc_q_list(uow, search=search, page=page, page_size=page_size)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 @router.get("/{id_supplier}", response_model=SupplierDetailOut)
-def get_supplier_detail(id_supplier: int, uow: UowDep = None):
+def get_supplier_detail(id_supplier: int, uow: UowDep):
     return uc_q_detail(uow, id_supplier=id_supplier)
 
 
@@ -59,20 +59,20 @@ def get_supplier_detail(id_supplier: int, uow: UowDep = None):
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_access_token)],
 )
-def create_supplier(payload: SupplierCreate, uow: UowDep = None):
+def create_supplier(payload: SupplierCreate, uow: UowDep):
     return uc_create(uow, data=payload)
 
 
 @router.put("/{id_supplier}", response_model=SupplierDetailOut)
 def update_supplier_bundle(
+    uow: UowDep,
     id_supplier: int = Path(..., ge=1),
     payload: SupplierBundleUpdate = ...,
-    uow: UowDep = None,
 ):
     return uc_update(uow, id_supplier=id_supplier, payload=payload)
 
 
 @router.delete("/{id_supplier}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_supplier_endpoint(id_supplier: int, uow: UowDep = None):
+def delete_supplier_endpoint(id_supplier: int, uow: UowDep):
     uc_delete(uow, id_supplier=id_supplier)
     return

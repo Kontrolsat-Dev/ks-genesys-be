@@ -3,6 +3,8 @@
 /db
 database.sqlite
 
+.vscode/
+
 /logs
 logs/
 idea/

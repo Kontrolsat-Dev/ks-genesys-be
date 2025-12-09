@@ -14,6 +14,15 @@ MAX_NAME_LEN = 200
 
 
 class SupplierWriteRepository:
+    """
+    Operações de escrita para Suppliers.
+
+    Nota arquitetural (CQRS pragmático):
+    Os métodos `get()` e `_get_by_name_ci()` são lookups auxiliares usados
+    internamente antes de operações de escrita (update, delete). Não fazem
+    parte da interface pública de leitura — para isso usar SupplierReadRepository.
+    """
+
     def __init__(self, db: Session):
         self.db = db
 
