@@ -23,7 +23,7 @@ from app.repositories.procurement.write.supplier_write_repo import (
 )
 from app.schemas.suppliers import SupplierBundleUpdate, SupplierDetailOut
 
-log = logging.getLogger("gsm.http")
+log = logging.getLogger("gsm.procurement.update_bundle")
 
 
 def _update_supplier_fields(
@@ -156,6 +156,10 @@ def execute(uow: UoW, *, id_supplier: int, payload: SupplierBundleUpdate) -> Sup
         # 1) Supplier (usa repo.update)
         _update_supplier_fields(sup_w, id_supplier, payload.supplier)
 
+        # 1b) Se ingest_enabled=True, garantir que existe job pending/running
+        if payload.supplier and getattr(payload.supplier, "ingest_enabled", None) is True:
+            _ensure_supplier_ingest_job(db, id_supplier)
+
         # 2) Feed
         feed_entity = _upsert_feed_for_supplier(feed_w, id_supplier, payload.feed)
 
@@ -176,3 +180,29 @@ def execute(uow: UoW, *, id_supplier: int, payload: SupplierBundleUpdate) -> Sup
 
     # Devolver o detalhe atualizado
     return uc_get_detail(uow, id_supplier=id_supplier)
+
+
+def _ensure_supplier_ingest_job(db, id_supplier: int) -> None:
+    """
+    Garante que existe um job pending/running para este supplier.
+    Chamado quando ingest_enabled é definido como True.
+    """
+    from app.background.job_handlers import JOB_KIND_SUPPLIER_INGEST
+    from app.repositories.worker.read.worker_job_read_repo import WorkerJobReadRepository
+    from app.repositories.worker.write.worker_job_write_repo import WorkerJobWriteRepository
+    from app.infra.base import utcnow
+
+    job_key = f"{JOB_KIND_SUPPLIER_INGEST}:{id_supplier}"
+    job_r = WorkerJobReadRepository(db)
+
+    if job_r.has_active_job_for_key(job_kind=JOB_KIND_SUPPLIER_INGEST, job_key=job_key):
+        return  # Já existe job
+
+    job_w = WorkerJobWriteRepository(db)
+    job_w.enqueue_job(
+        job_kind=JOB_KIND_SUPPLIER_INGEST,
+        job_key=job_key,
+        payload={"id_supplier": id_supplier},
+        not_before=utcnow(),
+    )
+    log.info("Created supplier_ingest job for supplier %d (ingest_enabled toggled)", id_supplier)

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.infra.bootstrap import ensure_brand_category_ci
+from app.infra.bootstrap import ensure_brand_category_ci, ensure_recurring_jobs
 from app.infra.session import engine
 
 from app.api.v1.auth import router as auth_router
@@ -56,8 +56,10 @@ app.add_middleware(
 async def on_startup():
     app.state.started_at = datetime.now(UTC)
     from app.models import create_db_and_tables
+    from app.infra.session import SessionLocal
 
     create_db_and_tables()
+    ensure_recurring_jobs(SessionLocal)
 
 
 # routers

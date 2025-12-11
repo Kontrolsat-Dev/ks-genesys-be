@@ -30,6 +30,15 @@ def execute(
     page: int,
     page_size: int,
 ) -> ProductPriceChangeListOut:
+    """
+    UseCase de relatório analítico.
+    Nota arquitetural:
+    Este módulo importa models diretamente (em vez de usar repos) porque:
+    - É um relatório read-only com query complexa multi-join
+    - A lógica de agregação está intimamente ligada à estrutura da query
+    - Mover para repo criaria abstração artificial sem benefício prático
+    Este padrão é aceitável para relatórios analíticos em CQRS pragmático.
+    """
     db = uow.db  # type: ignore[attr-defined]
 
     now = datetime.utcnow()
