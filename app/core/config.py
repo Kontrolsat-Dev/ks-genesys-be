@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     JWT_REFRESH_EXPIRE_MIN: int = 43200
     # Feed
     FEED_DOWNLOAD_TIMEOUT: int = 60
+    # General config
+    EOL_THRESHOLD_DAYS: int = 180
     # Prestashop
     PS_GENESYS_KEY: str
     PS_AUTH_VALIDATE_HEADER: str = "X-Genesys-Key"

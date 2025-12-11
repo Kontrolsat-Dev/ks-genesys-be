@@ -9,10 +9,10 @@ from app.models.supplier_item import SupplierItem
 
 
 @dataclass
-class MarkEolResult:
+class UnseenItemsStockResult:
     affected_products: list[int]
     items_total: int  # todos os unseen
-    items_stock_changed: int  # quantos foram >0 -> 0
+    items_stock_zeroed: int  # quantos foram >0 -> 0
     items_already_zero: int  # quantos já estavam a 0
 
 
@@ -53,9 +53,9 @@ class ProductEventWriteRepository:
         )
         return 1
 
-    def mark_eol_for_unseen_items(
+    def mark_unseen_items_stock_zero(
         self, *, id_feed: int, id_supplier: int, id_feed_run: int
-    ) -> MarkEolResult:
+    ) -> UnseenItemsStockResult:
         unseen_items = self.db.scalars(
             select(SupplierItem).where(
                 SupplierItem.id_feed == id_feed,
@@ -65,7 +65,7 @@ class ProductEventWriteRepository:
 
         affected_products: set[int] = set()
         items_total = 0
-        items_stock_changed = 0
+        items_stock_zeroed = 0
         items_already_zero = 0
 
         for it in unseen_items:
@@ -76,7 +76,7 @@ class ProductEventWriteRepository:
                 it.id_feed_run = id_feed_run
                 items_already_zero += 1
             else:
-                # transição >0 → 0 → evento EOL
+                # transição >0 → 0 → evento "ficou sem stock neste feed"
                 it.stock = 0
                 it.id_feed_run = id_feed_run
 
@@ -88,16 +88,16 @@ class ProductEventWriteRepository:
                         price=it.price,
                         stock=0,
                         id_feed_run=id_feed_run,
-                        reason="eol",
+                        reason="feed_missing",
                     )
                 )
-                items_stock_changed += 1
+                items_stock_zeroed += 1
 
             affected_products.add(it.id_product)
 
-        return MarkEolResult(
+        return UnseenItemsStockResult(
             affected_products=list(affected_products),
             items_total=items_total,
-            items_stock_changed=items_stock_changed,
+            items_stock_zeroed=items_stock_zeroed,
             items_already_zero=items_already_zero,
         )

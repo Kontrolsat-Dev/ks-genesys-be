@@ -159,3 +159,36 @@ class WorkerJobWriteRepository:
 
         # mark_failed já faz flush
         return len(ids)
+
+    def get_pending_or_running_by_key(self, job_key: str) -> WorkerJob | None:
+        """
+        Verifica se já existe um job pending ou running com a job_key dada.
+        Usado para evitar criar jobs duplicados.
+        """
+        stmt = (
+            select(WorkerJob)
+            .where(WorkerJob.job_key == job_key)
+            .where(WorkerJob.status.in_(["pending", "running"]))
+            .limit(1)
+        )
+        return self._db.execute(stmt).scalar_one_or_none()
+
+    def has_done_today(self, job_key: str, *, today: datetime.date) -> bool:
+        """
+        Verifica se já existe um job done com a job_key dada que correu hoje.
+        Usado para evitar correr o mesmo job várias vezes no mesmo dia.
+        """
+        from datetime import datetime, time
+
+        start_of_day = datetime.combine(today, time.min)
+        end_of_day = datetime.combine(today, time.max)
+
+        stmt = (
+            select(WorkerJob)
+            .where(WorkerJob.job_key == job_key)
+            .where(WorkerJob.status == "done")
+            .where(WorkerJob.finished_at >= start_of_day)
+            .where(WorkerJob.finished_at <= end_of_day)
+            .limit(1)
+        )
+        return self._db.execute(stmt).scalar_one_or_none() is not None

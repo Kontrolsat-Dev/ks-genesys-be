@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.models.product_active_offer import ProductActiveOffer
 from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
 from app.repositories.catalog.write.product_active_offer_write_repo import (
     ProductActiveOfferWriteRepository,
@@ -119,7 +118,7 @@ def recalculate_active_offer_for_product(
     db: Session,
     *,
     id_product: int,
-) -> ProductActiveOffer:
+):
     """
     Recalcula a oferta ativa de um produto com base nas SupplierItem atuais.
 

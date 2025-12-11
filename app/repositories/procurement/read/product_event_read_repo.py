@@ -3,9 +3,10 @@ from datetime import datetime, timedelta
 from typing import Any
 from collections.abc import Sequence
 
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc, func, or_
 from sqlalchemy.orm import Session
 
+from app.models import Product as P
 from app.models.supplier import Supplier as S
 from app.models.product_supplier_event import ProductSupplierEvent as PSE
 
@@ -130,3 +131,36 @@ class ProductEventReadRepository:
         if limit and limit > 0:
             stmt = stmt.limit(limit)
         return [dict(r._mapping) for r in self.db.execute(stmt).all()]
+
+    def list_products_to_mark_eol(self, *, cutoff: datetime) -> list[int]:
+        """
+        Devolve ids de produtos candidatos a EOL segundo a regra:
+
+        - product.is_eol = False
+        - product.created_at < cutoff  (produto tem pelo menos 180 dias)
+        - e uma destas:
+            * nunca teve stock > 0 (nenhum evento PSE com stock > 0)
+            * o último stock > 0 é anterior a `cutoff`
+        """
+
+        # subquery: último evento com stock > 0 por produto
+        last_stock_pos_ts = (
+            select(func.max(PSE.created_at))
+            .where(
+                PSE.id_product == P.id,
+                PSE.stock > 0,
+            )
+            .correlate(P)
+            .scalar_subquery()
+        )
+
+        stmt = select(P.id).where(
+            P.is_eol.is_(False),
+            P.created_at < cutoff,
+            or_(
+                last_stock_pos_ts.is_(None),  # nunca teve stock > 0
+                last_stock_pos_ts < cutoff,  # teve, mas há mais de 180 dias
+            ),
+        )
+
+        return [row[0] for row in self.db.execute(stmt).all()]

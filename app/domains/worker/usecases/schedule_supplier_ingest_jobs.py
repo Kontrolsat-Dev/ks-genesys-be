@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from datetime import datetime
 
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.background.job_handlers import JOB_KIND_SUPPLIER_INGEST
@@ -35,10 +35,7 @@ def schedule_supplier_ingest_jobs(uow: UoW, *, now: datetime) -> int:
     job_w = WorkerJobWriteRepository(db)
 
     stmt = select(Supplier.id, Supplier.ingest_interval_minutes).where(
-        and_(
-            Supplier.ingest_enabled.is_(True),
-            Supplier.ingest_next_run_at.is_(None),  # só seed inicial
-        )
+        Supplier.ingest_enabled.is_(True)
     )
     rows = list(db.execute(stmt).all())
 

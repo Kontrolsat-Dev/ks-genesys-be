@@ -1,7 +1,7 @@
 # app/models/product_supplier_event.py
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infra.base import Base, utcnow
@@ -14,6 +14,12 @@ class ProductSupplierEvent(Base):
         Index("ix_pse_product_created", "id_product", "created_at"),
         Index("ix_pse_supplier_product", "id_supplier", "id_product"),
         Index("ix_pse_gtin_created", "gtin", "created_at"),
+        Index(
+            "ix_pse_stock_positive",
+            "id_product",
+            "created_at",
+            postgresql_where=text("stock > 0"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -33,7 +39,7 @@ class ProductSupplierEvent(Base):
     )
 
     reason: Mapped[str] = mapped_column(
-        String(10), default="init", nullable=False
+        String(30), default="init", nullable=False
     )  # init|change|eol
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 

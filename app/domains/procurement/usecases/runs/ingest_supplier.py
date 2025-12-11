@@ -45,7 +45,8 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
        - Product.get_or_create + fill canonicals + brand/category + meta.
        - SupplierItem.upsert → deteta created/changed.
        - ProductSupplierEvent.record_from_item_change (init/change).
-    4) mark_eol_for_unseen_items → regista events "eol" + devolve products afetados.
+    4) mark_unseen_items_stock_zero → zera stock de itens não vistos neste run
+       e regista eventos "feed_missing" por supplier.
     5) Para cada produto afetado com id_ecommerce:
        - recalcula ProductActiveOffer com base nas SupplierItem atuais;
        - compara snapshot anterior vs novo;
@@ -184,17 +185,17 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
                     bad,
                 )
 
-        # --- 4) EOL dos itens não vistos neste run ---
-        eol_res = ev_w.mark_eol_for_unseen_items(
+        # --- 4) Itens não vistos neste run (stock -> 0 por feed) ---
+        unseen_res = ev_w.mark_unseen_items_stock_zero(
             id_feed=feed.id,
             id_supplier=id_supplier,
             id_feed_run=id_run,
         )
-        eol_marked = eol_res.items_stock_changed  # “mudanças reais”
-        eol_unseen = eol_res.items_total  # “desaparecidos do feed”
-        affected_products.update(eol_res.affected_products)
+        unseen_total = unseen_res.items_total
+        unseen_stock_zeroed = unseen_res.items_stock_zeroed
+        affected_products.update(unseen_res.affected_products)
 
-        log.info("[run=%s] EOL marked=%s", id_run, eol_marked)
+        log.info("[run=%s] unseen_items_stock_zeroed=%s", id_run, unseen_stock_zeroed)
 
         # --- 5) Active offer + eventos de estado (apenas para produtos com id_ecommerce) ---
         sync_active_offer_for_products(
@@ -215,14 +216,14 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
 
         status = (run_r.get(id_run) or run).status
         log.info(
-            "[run=%s] done status=%s total=%s ok=%s bad=%s changed=%s eol=%s",
+            "[run=%s] done status=%s total=%s ok=%s bad=%s changed=%s unseen_total=%s",
             id_run,
             status,
             total,
             ok,
             bad,
             changed,
-            eol_marked,
+            unseen_total,
         )
 
         return {
@@ -233,8 +234,8 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
             "rows_valid": ok,
             "rows_invalid": bad,
             "changes": changed,
-            "eol_unseen": eol_unseen,
-            "eol_marked": eol_marked,
+            "unseen_total": unseen_total,
+            "unseen_stock_zeroed": unseen_stock_zeroed,
             "status": status,
         }
 

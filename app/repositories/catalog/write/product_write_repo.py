@@ -184,3 +184,18 @@ class ProductWriteRepository:
         p.margin = margin
         self.db.add(p)
         self.db.flush()
+
+    def set_eol(self, id_product: int, is_eol: bool) -> None:
+        """
+        Marca um produto como EOL (End of Life) ou não.
+
+        EOL significa que o produto desapareceu de todos os catálogos de fornecedores
+        (não veio em nenhum feed), não apenas que tem stock = 0.
+        """
+        p = self.db.get(Product, id_product)
+        if not p:
+            return
+        if p.is_eol != is_eol:
+            p.is_eol = is_eol
+            self.db.add(p)
+            self.db.flush()

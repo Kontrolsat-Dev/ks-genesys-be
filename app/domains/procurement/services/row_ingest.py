@@ -197,6 +197,17 @@ def process_row(
         id_feed_run=id_run,
     )
 
+    # 5.1) Se o produto estava EOL e agora este supplier tem stock > 0, reverter EOL
+    if stock > 0 and p.is_eol:
+        p.is_eol = False
+        log.info(
+            "[run=%s] product_id=%s revived_from_eol_by_supplier=%s stock=%s",
+            id_run,
+            p.id,
+            id_supplier,
+            stock,
+        )
+
     # 6) Evento por criação/alteração da oferta do supplier
     changed += ev_w.record_from_item_change(
         id_product=p.id,
