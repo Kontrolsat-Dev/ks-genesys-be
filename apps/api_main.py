@@ -5,9 +5,9 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from app.infra.bootstrap import ensure_brand_category_ci, ensure_recurring_jobs
-from app.infra.session import engine
+
+from app.infra.bootstrap import ensure_recurring_jobs
+
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.feeds import router as feeds_router
@@ -29,12 +29,6 @@ from app.core.middleware import RequestContextMiddleware
 from app.core.config import settings
 
 setup_logging()
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    ensure_brand_category_ci(engine)
-    yield
 
 
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)

@@ -210,6 +210,8 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
             id_run,
             rows_total=total,
             rows_changed=changed,
+            rows_failed=bad,
+            rows_unseen=unseen_stock_zeroed,
             partial=bool(bad and ok),
         )
         uow.commit()

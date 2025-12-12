@@ -21,6 +21,8 @@ class FeedRun(Base):
     http_status: Mapped[int | None] = mapped_column(Integer, default=None)
     rows_total: Mapped[int] = mapped_column(Integer, default=0)
     rows_changed: Mapped[int] = mapped_column(Integer, default=0)
+    rows_failed: Mapped[int] = mapped_column(Integer, default=0)
+    rows_unseen: Mapped[int] = mapped_column(Integer, default=0)
     duration_ms: Mapped[int | None] = mapped_column(Integer, default=None)
     error_msg: Mapped[str | None] = mapped_column(Text, default=None)
 

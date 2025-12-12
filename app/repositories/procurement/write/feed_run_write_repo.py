@@ -36,13 +36,23 @@ class FeedRunWriteRepository:
         *,
         rows_total: int,
         rows_changed: int,
+        rows_failed: int,
+        rows_unseen: int,
         partial: bool,
     ) -> None:
         run = self._get_required(id_run)
+
         run.status = "partial" if partial else "ok"
         run.rows_total = rows_total
         run.rows_changed = rows_changed
+        run.rows_failed = rows_failed
+        run.rows_unseen = rows_unseen
         run.finished_at = utcnow()
+        # Calculate duration
+        if run.started_at and run.finished_at:
+            delta = run.finished_at - run.started_at
+            run.duration_ms = int(delta.total_seconds() * 1000)
+
         self.db.flush()
 
     def finalize_http_error(
