@@ -38,6 +38,7 @@ class PrestashopClient:
         self.validate_url: str | None = getattr(settings, "PS_AUTH_VALIDATE_URL", None)
         self.categories_url: str | None = getattr(settings, "PS_CATEGORIES_URL", None)
         self.brands_url: str | None = getattr(settings, "PS_BRANDS_URL", None)
+        self.products_url: str | None = getattr(settings, "PS_PRODUCTS_URL", None)
         self.header_name: str | None = getattr(settings, "PS_AUTH_VALIDATE_HEADER", None)
         self.genesys_key: str | None = getattr(settings, "PS_GENESYS_KEY", None)
 
@@ -424,6 +425,172 @@ class PrestashopClient:
                     time.sleep(self.retry_backoff * (2**attempt))
                     continue
                 raise RuntimeError("upstream_timeout") from e
+
+            except RuntimeError as e:
+                last_exc = e
+                if str(e).startswith("upstream_5xx:") and attempt < self.retry_attempts:
+                    time.sleep(self.retry_backoff * (2**attempt))
+                    continue
+                raise
+
+        raise last_exc or RuntimeError("upstream_unknown")
+
+    def create_product(self, product_data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Create a product in PrestaShop via r_genesys module.
+
+        Expected product_data fields:
+        - name: str
+        - description: str | None
+        - id_category: int (PS category ID)
+        - price: str (e.g., "29.99")
+        - gtin: str | None
+        - partnumber: str | None
+        - image_url: str | None
+        - weight: str | None
+        - id_brand: int | None (PS brand ID)
+        """
+        if not self.products_url:
+            raise ValueError("PS_PRODUCTS_URL not configured")
+
+        url = self.products_url
+        headers = {
+            self.header_name: self.genesys_key,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": self.user_agent,
+        }
+
+        log.info(
+            "ps.create_product POST url=%s name=%s",
+            url,
+            product_data.get("name", "?")[:50],
+        )
+
+        last_exc: Exception | None = None
+        for attempt in range(self.retry_attempts + 1):
+            t0 = time.perf_counter()
+            try:
+                resp = requests.post(
+                    url,
+                    json=product_data,
+                    headers=headers,
+                    timeout=self.timeout,
+                    verify=self.verify,
+                )
+                dur_ms = (time.perf_counter() - t0) * 1000
+                sc = resp.status_code
+                ctype = resp.headers.get("Content-Type", "")
+                clen = _len_bytes(resp.content)
+
+                log.info(
+                    "ps.create_product POST done status=%s dur=%.1fms ctype=%s len=%d attempt=%d",
+                    sc,
+                    dur_ms,
+                    ctype,
+                    clen,
+                    attempt + 1,
+                )
+
+                if 200 <= sc < 300:
+                    try:
+                        data = resp.json() if resp.content else {}
+                    except Exception as parse_err:
+                        log.warning(
+                            "ps.create_product json_parse_error dur=%.1fms len=%d attempt=%d",
+                            dur_ms,
+                            clen,
+                            attempt + 1,
+                        )
+                        raise RuntimeError("upstream_invalid_json") from parse_err
+
+                    product_id = data.get("id_product") or data.get("id") or data.get("product_id")
+                    if not product_id:
+                        log.warning(
+                            "ps.create_product missing_id dur=%.1fms attempt=%d",
+                            dur_ms,
+                            attempt + 1,
+                        )
+                        raise RuntimeError("create_product_failed:missing_id")
+
+                    return {
+                        "id_product": product_id,
+                        "success": True,
+                        **data,
+                    }
+
+                if sc in (400, 422):
+                    # Validation error - don't retry
+                    try:
+                        err_data = resp.json()
+                    except Exception:
+                        err_data = {"error": resp.text[:500]}
+                    log.warning(
+                        "ps.create_product validation_error status=%s dur=%.1fms data=%s",
+                        sc,
+                        dur_ms,
+                        err_data,
+                    )
+                    raise RuntimeError(f"validation_error:{err_data.get('error', 'unknown')}")
+
+                if sc in (401, 403):
+                    log.warning(
+                        "ps.create_product unauthorized status=%s dur=%.1fms attempt=%d",
+                        sc,
+                        dur_ms,
+                        attempt + 1,
+                    )
+                    raise RuntimeError("unauthorized")
+
+                if 500 <= sc < 600:
+                    log.warning(
+                        "ps.create_product 5xx status=%s dur=%.1fms attempt=%d",
+                        sc,
+                        dur_ms,
+                        attempt + 1,
+                    )
+                    last_exc = RuntimeError(f"upstream_5xx:{sc}")
+                    if attempt < self.retry_attempts:
+                        time.sleep(self.retry_backoff * (2**attempt))
+                        continue
+                    raise last_exc
+
+                # Other status codes
+                log.warning(
+                    "ps.create_product unexpected_status=%s dur=%.1fms attempt=%d",
+                    sc,
+                    dur_ms,
+                    attempt + 1,
+                )
+                raise RuntimeError(f"upstream_unexpected:{sc}")
+
+            except (ConnectTimeout, ReadTimeout, Timeout) as e:
+                dur_ms = (time.perf_counter() - t0) * 1000
+                log.warning(
+                    "ps.create_product timeout dur=%.1fms attempt=%d err=%s",
+                    dur_ms,
+                    attempt + 1,
+                    type(e).__name__,
+                )
+                last_exc = e
+                if attempt < self.retry_attempts:
+                    time.sleep(self.retry_backoff * (2**attempt))
+                    continue
+                raise RuntimeError("upstream_timeout") from e
+
+            except ConnErr as e:
+                dur_ms = (time.perf_counter() - t0) * 1000
+                log.warning(
+                    "ps.create_product conn_error dur=%.1fms attempt=%d err=%s",
+                    dur_ms,
+                    attempt + 1,
+                    str(e)[:100],
+                )
+                last_exc = e
+                if attempt < self.retry_attempts:
+                    time.sleep(self.retry_backoff * (2**attempt))
+                    continue
+                raise RuntimeError("upstream_connection_error") from e
 
             except RuntimeError as e:
                 last_exc = e

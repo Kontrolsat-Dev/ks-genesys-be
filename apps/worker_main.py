@@ -101,6 +101,20 @@ async def run_worker_loop() -> None:
                 # Persistir alterações de status/attempts/not_before
                 uow.commit()
 
+            # 2b) Cleanup: marcar FeedRuns 'running' há muito tempo como error
+            from app.repositories.procurement.write.feed_run_write_repo import (
+                FeedRunWriteRepository,
+            )
+
+            run_w = FeedRunWriteRepository(db)
+            stale_runs = run_w.mark_stale_running_as_error(stale_after_minutes=120)
+            if stale_runs:
+                logger.warning(
+                    "Marked %d stale FeedRun(s) as error (>2h running)",
+                    stale_runs,
+                )
+                uow.commit()
+
             # 3) Scheduler: garantir jobs para suppliers (supplier_ingest)
             if JOB_KIND_SUPPLIER_INGEST in configs:
                 created = schedule_supplier_ingest_jobs(uow, now=now)

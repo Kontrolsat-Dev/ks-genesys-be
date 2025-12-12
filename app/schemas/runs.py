@@ -13,8 +13,8 @@ class FeedRunOut(BaseModel):
     finished_at: datetime | None = None
     rows_total: int
     rows_changed: int  # Note: This is item-level changes, can exceed rows_total
-    rows_failed: int
-    rows_unseen: int
+    rows_failed: int = 0
+    rows_unseen: int = 0
     http_status: int | None = None
     duration_ms: int | None = None
     error_msg: str | None = None

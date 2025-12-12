@@ -124,6 +124,20 @@ class ProductMarginUpdate(BaseModel):
     margin: float = Field(..., ge=0.0)
 
 
+class ProductImportIn(BaseModel):
+    """Payload para importar produto para PrestaShop."""
+
+    id_ps_category: int = Field(..., description="ID da categoria no PrestaShop")
+
+
+class ProductImportOut(BaseModel):
+    """Response após importar produto."""
+
+    id_product: int
+    id_ecommerce: int | None
+    success: bool
+
+
 # --------------------------
 
 

@@ -1,5 +1,7 @@
 # app/repositories/procurement/write/feed_run_write_repo.py
 from __future__ import annotations
+from datetime import timedelta
+from sqlalchemy import select
 
 from sqlalchemy.orm import Session
 
@@ -75,3 +77,27 @@ class FeedRunWriteRepository:
         run.error_msg = (error_msg or "")[:500]
         run.finished_at = utcnow()
         self.db.flush()
+
+    def mark_stale_running_as_error(self, *, stale_after_minutes: int = 120) -> int:
+        """
+        Marca FeedRuns que estão 'running' há mais de X minutos como 'error'.
+        Usado como cleanup para runs que ficaram órfãs (worker crashou, etc).
+        Retorna o número de runs marcadas como error.
+        """
+        cutoff = utcnow() - timedelta(minutes=stale_after_minutes)
+
+        stmt = select(FeedRun).where(FeedRun.status == "running").where(FeedRun.started_at < cutoff)
+
+        stale_runs = self.db.scalars(stmt).all()
+        count = 0
+
+        for run in stale_runs:
+            run.status = "error"
+            run.error_msg = f"Stale: running for more than {stale_after_minutes} minutes"
+            run.finished_at = utcnow()
+            count += 1
+
+        if count:
+            self.db.flush()
+
+        return count

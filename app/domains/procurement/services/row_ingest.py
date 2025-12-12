@@ -167,6 +167,7 @@ def process_row(
         p.id,
         brand_name=brand_name,
         category_name=category_name,
+        id_supplier=id_supplier,
     )
 
     # 4) Meta não-canónica

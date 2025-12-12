@@ -26,6 +26,7 @@ from app.domains.catalog.usecases.products.list_catalog_price_changes import (
 from app.domains.catalog.usecases.products.get_product_facets import (
     execute as uc_get_product_facets,
 )
+from app.domains.catalog.usecases.products import import_to_prestashop as uc_import_product
 from app.infra.uow import UoW
 from app.schemas.products import (
     ProductDetailOut,
@@ -33,7 +34,11 @@ from app.schemas.products import (
     ProductListOut,
     ProductMarginUpdate,
     ProductPriceChangeListOut,
+    ProductImportIn,
+    ProductImportOut,
 )
+from app.core.deps import get_prestashop_client
+from app.external.prestashop_client import PrestashopClient
 
 router = APIRouter(
     prefix="/products", tags=["products"], dependencies=[Depends(require_access_token)]
@@ -304,3 +309,30 @@ def list_catalog_price_changes(
         page=page,
         page_size=page_size,
     )
+
+
+@router.post(
+    "/{id_product}/import",
+    response_model=ProductImportOut,
+    summary="Importar produto para PrestaShop",
+)
+def import_product_to_prestashop(
+    uow: UowDep,
+    id_product: int = Path(..., ge=1),
+    payload: ProductImportIn = ...,
+    ps_client: PrestashopClient = Depends(get_prestashop_client),
+) -> ProductImportOut:
+    """
+    Importa um produto para o PrestaShop.
+
+    - Valida que o produto existe e não está já importado
+    - Envia dados para a API do PrestaShop (r_genesys module)
+    - Actualiza o product.id_ecommerce com o ID do PS
+    """
+    result = uc_import_product.execute(
+        uow,
+        ps_client,
+        id_product=id_product,
+        id_ps_category=payload.id_ps_category,
+    )
+    return ProductImportOut(**result)

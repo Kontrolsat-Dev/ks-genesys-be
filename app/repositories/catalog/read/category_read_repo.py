@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select, func, and_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.normalize import normalize_key_ci
 from app.models.category import Category
@@ -26,17 +26,27 @@ class CategoryReadRepository:
             .first()
         )
 
-    def list(self, *, q: str | None, page: int, page_size: int):
+    def list(
+        self,
+        *,
+        q: str | None,
+        page: int,
+        page_size: int,
+        auto_import: bool | None = None,
+    ):
         # bounds
         page = max(1, page)
         page_size = max(1, min(page_size, 100))
 
         # base & filtros
-        stmt = select(Category)
+        stmt = select(Category).options(joinedload(Category.supplier_source))
         filters = []
         if q:
             like = f"%{q.strip()}%"
             filters.append(func.btrim(Category.name).ilike(like))
+
+        if auto_import is not None:
+            filters.append(Category.auto_import == auto_import)
 
         if filters:
             stmt = stmt.where(and_(*filters))
@@ -57,5 +67,10 @@ class CategoryReadRepository:
             Category.id.asc(),
         )
 
-        rows = self.db.execute(stmt.limit(page_size).offset((page - 1) * page_size)).scalars().all()
+        rows = (
+            self.db.execute(stmt.limit(page_size).offset((page - 1) * page_size))
+            .scalars()
+            .unique()
+            .all()
+        )
         return rows, int(total)

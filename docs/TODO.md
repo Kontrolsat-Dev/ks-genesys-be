@@ -49,11 +49,11 @@
 
 ### Phase 1: Category Mapping
 
-- [ ] Adicionar campos ao modelo `Category`: `id_ps_category`, `ps_category_name`, `auto_import`
-- [ ] Atualizar schemas em `app/schemas/categories.py`
-- [ ] Criar endpoints de mapeamento: `PUT /{id}/mapping`, `DELETE /{id}/mapping`, `GET /mapped`
-- [ ] Criar usecase `update_category_mapping.py`
-- [ ] Atualizar frontend `/categories` com UI de mapeamento
+- [x] Adicionar campos ao modelo `Category`: `id_ps_category`, `ps_category_name`, `auto_import`
+- [x] Atualizar schemas em `app/schemas/categories.py`
+- [x] Criar endpoints de mapeamento: `PUT /{id}/mapping`, `DELETE /{id}/mapping`, `GET /mapped`
+- [x] Criar usecase `update_category_mapping.py`
+- [x] Atualizar frontend `/categories` com UI de mapeamento
 
 ### Phase 1.5: Bulk Import Manual (UI)
 

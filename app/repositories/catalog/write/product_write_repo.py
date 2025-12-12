@@ -141,7 +141,12 @@ class ProductWriteRepository:
             self.db.flush()
 
     def fill_brand_category_if_empty(
-        self, id_product: int, *, brand_name: str | None, category_name: str | None
+        self,
+        id_product: int,
+        *,
+        brand_name: str | None,
+        category_name: str | None,
+        id_supplier: int | None = None,
     ):
         p = self.db.get(Product, id_product)
         if not p:
@@ -151,7 +156,11 @@ class ProductWriteRepository:
             p.id_brand = BrandsWriteRepository(self.db).get_or_create(brand_name).id
             changed = True
         if category_name and not p.id_category:
-            p.id_category = CategoryWriteRepository(self.db).get_or_create(category_name).id
+            p.id_category = (
+                CategoryWriteRepository(self.db)
+                .get_or_create(category_name, id_supplier=id_supplier)
+                .id
+            )
             changed = True
         if changed:
             self.db.add(p)

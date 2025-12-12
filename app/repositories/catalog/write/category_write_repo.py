@@ -12,7 +12,7 @@ from app.repositories.catalog.read.category_read_repo import (
 
 
 class CategoryWriteRepository(CategoryReadRepository):
-    def get_or_create(self, name: str) -> Category:
+    def get_or_create(self, name: str, *, id_supplier: int | None = None) -> Category:
         shown = normalize_simple(name, MAX_NAME_LEN)
         key = normalize_key_ci(name, MAX_NAME_LEN)
         if not key:
@@ -22,7 +22,7 @@ class CategoryWriteRepository(CategoryReadRepository):
         if existing:
             return existing
 
-        c = Category(name=shown)
+        c = Category(name=shown, id_supplier_source=id_supplier)
         self.db.add(c)
         try:
             self.db.flush()
@@ -34,8 +34,8 @@ class CategoryWriteRepository(CategoryReadRepository):
                 return again
             raise
 
-    def create(self, name: str) -> Category:
-        return self.get_or_create(name)
+    def create(self, name: str, *, id_supplier: int | None = None) -> Category:
+        return self.get_or_create(name, id_supplier=id_supplier)
 
     def update(self, id_category: int, *, name: str | None = None) -> Category:
         c = self.get_required(id_category)
