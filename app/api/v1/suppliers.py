@@ -37,19 +37,35 @@ router = APIRouter(
 UowDep = Annotated[UoW, Depends(get_uow)]
 
 
-@router.get("", response_model=SupplierList)
+@router.get(
+    "",
+    response_model=SupplierList,
+    summary="Listar fornecedores",
+)
 def list_suppliers(
     uow: UowDep,
     search: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
 ):
+    """
+    Lista todos os fornecedores com paginação e pesquisa opcional.
+    Inclui informação básica de cada fornecedor.
+    """
     items, total = uc_q_list(uow, search=search, page=page, page_size=page_size)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
-@router.get("/{id_supplier}", response_model=SupplierDetailOut)
+@router.get(
+    "/{id_supplier}",
+    response_model=SupplierDetailOut,
+    summary="Obter detalhes de fornecedor",
+)
 def get_supplier_detail(id_supplier: int, uow: UowDep):
+    """
+    Retorna informação detalhada de um fornecedor.
+    Inclui configuração do feed, mapper e estatísticas de sincronização.
+    """
     return uc_q_detail(uow, id_supplier=id_supplier)
 
 
@@ -57,22 +73,43 @@ def get_supplier_detail(id_supplier: int, uow: UowDep):
     "",
     response_model=SupplierOut,
     status_code=status.HTTP_201_CREATED,
+    summary="Criar fornecedor",
     dependencies=[Depends(require_access_token)],
 )
 def create_supplier(payload: SupplierCreate, uow: UowDep):
+    """
+    Cria um novo fornecedor no sistema.
+    Apenas cria o registo base - feed e mapper devem ser configurados separadamente.
+    """
     return uc_create(uow, data=payload)
 
 
-@router.put("/{id_supplier}", response_model=SupplierDetailOut)
+@router.put(
+    "/{id_supplier}",
+    response_model=SupplierDetailOut,
+    summary="Atualizar fornecedor (bundle)",
+)
 def update_supplier_bundle(
     uow: UowDep,
     id_supplier: int = Path(..., ge=1),
     payload: SupplierBundleUpdate = ...,
 ):
+    """
+    Atualiza um fornecedor e opcionalmente o seu feed e mapper numa única operação.
+    Útil para guardar todas as configurações de uma vez.
+    """
     return uc_update(uow, id_supplier=id_supplier, payload=payload)
 
 
-@router.delete("/{id_supplier}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{id_supplier}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar fornecedor",
+)
 def delete_supplier_endpoint(id_supplier: int, uow: UowDep):
+    """
+    Remove um fornecedor e todos os dados associados (feed, mapper, produtos).
+    Esta operação é irreversível.
+    """
     uc_delete(uow, id_supplier=id_supplier)
     return

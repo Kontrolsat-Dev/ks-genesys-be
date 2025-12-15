@@ -1,3 +1,4 @@
+# app/api/v1/catalog_update_stream.py
 from __future__ import annotations
 
 
@@ -26,15 +27,20 @@ router = APIRouter(
 )
 
 
-@router.get("/pending", response_model=CatalogUpdateBatchOut)
+@router.get(
+    "/pending",
+    response_model=CatalogUpdateBatchOut,
+    summary="Obter batch de eventos pendentes",
+)
 def get_pending_events(
     limit: int = Query(50, ge=1, le=500),
     min_priority: int | None = Query(None, ge=1),
     uow: UoW = Depends(get_uow),
 ) -> CatalogUpdateBatchOut:
     """
-    Devolve um batch de eventos `pending` e marca-os como `processing`.
-    A lógica de negócio vive no usecase.
+    Obtém um batch de eventos pendentes para processamento.
+    Os eventos retornados são marcados como 'processing' para evitar duplicação.
+    Usar /ack para confirmar processamento com sucesso ou falha.
     """
     result = uc_get_pending(
         uow,
@@ -48,14 +54,18 @@ def get_pending_events(
     )
 
 
-@router.post("/ack")
+@router.post(
+    "/ack",
+    summary="Confirmar processamento de eventos",
+)
 def ack_events(
     payload: CatalogUpdateAckIn,
     uow: UoW = Depends(get_uow),
 ) -> dict:
     """
-    ACK de eventos (done | failed).
-    Router só encaminha para o usecase.
+    Confirma o processamento de um ou mais eventos.
+    Status pode ser 'done' (sucesso) ou 'failed' (erro).
+    Eventos falhados podem incluir mensagem de erro para diagnóstico.
     """
     return uc_ack_events(
         uow,
@@ -68,6 +78,7 @@ def ack_events(
 @router.get(
     "",
     response_model=CatalogUpdateStreamListOut,
+    summary="Listar eventos do stream",
     dependencies=[Depends(require_access_token)],
 )
 def list_catalog_update_events(
@@ -79,6 +90,10 @@ def list_catalog_update_events(
     page_size: int = Query(20, ge=1, le=100),
     uow: UoW = Depends(get_uow),
 ):
+    """
+    Lista todos os eventos do catalog update stream com paginação.
+    Permite filtrar por status para monitorizar o processamento.
+    """
     return uc_list_events.execute(
         uow,
         page=page,
@@ -90,6 +105,7 @@ def list_catalog_update_events(
 @router.get(
     "/errors",
     response_model=CatalogUpdateStreamListOut,
+    summary="Listar eventos com erro",
     dependencies=[Depends(require_access_token)],
 )
 def list_catalog_update_errors(
@@ -97,6 +113,10 @@ def list_catalog_update_errors(
     page_size: int = Query(20, ge=1, le=100),
     uow: UoW = Depends(get_uow),
 ):
+    """
+    Lista apenas os eventos que falharam durante o processamento.
+    Atalho conveniente para diagnosticar problemas de sincronização.
+    """
     return uc_list_events.execute(
         uow,
         page=page,

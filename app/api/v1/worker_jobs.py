@@ -42,7 +42,8 @@ def list_worker_jobs(
     page_size: int = Query(20, ge=1, le=100),
 ) -> WorkerJobListOut:
     """
-    Lista jobs do worker com filtros opcionais por job_kind e status.
+    Lista os jobs do worker com paginação e filtros opcionais.
+    Permite monitorizar o estado das tarefas em background.
     """
     return uc_list_worker_jobs(
         uow,
@@ -68,7 +69,8 @@ def list_worker_jobs_errors(
     page_size: int = Query(20, ge=1, le=100),
 ) -> WorkerJobListOut:
     """
-    Atalho para listar apenas jobs com status=failed.
+    Lista apenas os jobs que falharam permanentemente.
+    Atalho conveniente para diagnosticar problemas em tarefas de background.
     """
     return uc_list_worker_jobs(
         uow,
@@ -81,12 +83,12 @@ def list_worker_jobs_errors(
 
 @router.post(
     "/supplier-ingests/schedule",
-    summary="Agendar jobs de ingest para suppliers com ingest_enabled",
+    summary="Agendar jobs de ingest para fornecedores",
 )
 def schedule_supplier_ingests(uow: UowDep) -> dict[str, Any]:
     """
-    Cria um job 'supplier_ingest' por supplier com ingest_enabled=TRUE
-    e ingest_next_run_at IS NULL.
-    Atualiza também o ingest_next_run_at para 'agora'.
+    Cria jobs de ingest para todos os fornecedores com ingest_enabled=True.
+    Apenas cria jobs se não existir já um job pending ou running para esse fornecedor.
+    Útil para forçar re-agendamento manual em caso de problemas.
     """
     return uc_schedule_supplier_ingest_jobs(uow)

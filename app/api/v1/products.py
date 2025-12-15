@@ -70,6 +70,11 @@ def list_products(
     sort: Literal["recent", "name", "cheapest"] = Query("recent"),
     expand_offers: bool = Query(True),
 ):
+    """
+    Lista produtos do catálogo com paginação e filtros avançados.
+    Suporta pesquisa por texto, GTIN, marca, categoria, stock e fornecedor.
+    Opcionalmente expande as ofertas de cada produto.
+    """
     return uc_q_list_products(
         uow,
         page=page,
@@ -154,6 +159,11 @@ def get_product_detail(
     events_limit: int | None = Query(2000, ge=1, le=100000),
     aggregate_daily: bool = Query(True),
 ):
+    """
+    Obtém informação detalhada de um produto por ID.
+    Inclui metadados, ofertas de fornecedores e histórico de eventos.
+    Parâmetros permitem controlar que secções são expandidas.
+    """
     return uc_q_product_detail(
         uow,
         id_product=id_product,
@@ -181,6 +191,10 @@ def get_product_detail_by_gtin(
     events_limit: int | None = Query(2000, ge=1, le=100000),
     aggregate_daily: bool = Query(True),
 ) -> ProductDetailOut:
+    """
+    Obtém informação detalhada de um produto por código GTIN/EAN.
+    Útil para pesquisa por código de barras.
+    """
     return uc_q_product_detail_by_gtin(
         uow,
         gtin=gtin.strip(),
@@ -196,6 +210,7 @@ def get_product_detail_by_gtin(
 @router.patch(
     "/{id_product}/margin",
     response_model=ProductDetailOut,
+    summary="Atualizar margem de produto",
 )
 def update_product_margin(
     uow: UowDep,

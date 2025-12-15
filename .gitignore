@@ -4,6 +4,7 @@
 database.sqlite
 
 .vscode/
+.agent/
 
 /logs
 logs/

@@ -10,14 +10,20 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 UserDep = Annotated[dict, Depends(require_access_token)]
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponse, summary="Autenticação de utilizador")
 def post_login(
     body: LoginRequest,
     client: PrestashopClient = Depends(get_prestashop_client),
 ):
+    """
+    Autenticação de utilizador.
+    """
     return uc_login(body, auth_login=client.login)
 
 
-@router.get("/me")
+@router.get("/me", summary="Informações do utilizador autenticado")
 def get_me(user: UserDep):
+    """
+    Retorna as informações do utilizador autenticado.
+    """
     return {"user": user}
