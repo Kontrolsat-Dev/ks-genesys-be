@@ -57,27 +57,38 @@
 
 ### Phase 1.5: Bulk Import Manual (UI)
 
-- [ ] Criar schemas `BulkImportIn`, `BulkImportItemResult`, `BulkImportOut`
-- [ ] Criar endpoint `POST /products/import`
+- [ ] Criar schemas `BulkImportIn`, `BulkImportOut`
+- [ ] Criar endpoint `POST /products/bulk-import`
 - [ ] Criar usecase `bulk_import.py`
 - [ ] Adicionar checkboxes na tabela de produtos (frontend)
 - [ ] Adicionar botão "Importar Selecionados" (frontend)
-- [ ] Criar componente `import-modal.tsx` com seleção de categoria PS
-- [ ] Adicionar indicação visual de estado importação (✅ PS #ID / ⚠️ Não imp.)
+- [ ] Criar modal de confirmação com preview
 
 ### Phase 2: Auto-Import Worker
 
 - [ ] Adicionar `JOB_KIND_PRODUCT_AUTO_IMPORT` em `job_handlers.py`
 - [ ] Criar usecase `product_auto_import.py`
-- [ ] Adicionar `PrestashopClient.create_product()` (stub para r_genesys)
 - [ ] Registar novo job kind no `worker_main.py`
 - [ ] Configurar scheduling (1-2x por dia)
 
 ### Phase 3: Stock/Price Sync
 
-- [ ] Criar usecase `sync_product_to_ps.py`
-- [ ] Adicionar `PrestashopClient.update_product()` (stub para r_genesys)
-- [ ] Integrar sync no processamento do `CatalogUpdateStream`
+- [x] **Refatorar ProductActiveOffer sync** ✅
+  - `ProductActiveOffer` só atualizada quando `/ack` recebe `status=done`
+  - Corrigido cálculo de margem (removido `/100` desnecessário)
+  - Adicionado `get_by_ids()` ao `CatalogUpdateStreamReadRepository`
+  - `active_offer_sync.py` usa `select_best_offer_for_import()` sem persistir
+  - `sync_events.py` modificado para aceitar `BestOfferResult`
+  - `ack_events.py` atualiza `ProductActiveOffer` com dados do payload
+
+- [x] **Frontend: Fixed active offer display** ✅
+  - `product-stats.tsx` usa `unit_price_sent` do backend, não calcula dinamicamente
+
+- [x] **Filtro imported** ✅
+  - Adicionado `imported=true|false` ao endpoint `/products`
+  - Filtra por `id_ecommerce IS NOT NULL AND > 0`
+
+- [ ] Integrar sync no processamento do `CatalogUpdateStream` (cronjob PS)
 
 ### Phase 4: Relatórios (Futuro)
 

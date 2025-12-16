@@ -67,9 +67,12 @@ def list_products(
     category: str | None = Query(None),
     has_stock: bool | None = Query(None),
     id_supplier: int | None = Query(None),
+    imported: bool | None = Query(
+        None, description="Filter by import status: true=imported, false=not imported"
+    ),
     sort: Literal["recent", "name", "cheapest"] = Query("recent"),
     expand_offers: bool = Query(True),
-):
+) -> ProductListOut:
     """
     Lista produtos do catálogo com paginação e filtros avançados.
     Suporta pesquisa por texto, GTIN, marca, categoria, stock e fornecedor.
@@ -88,6 +91,7 @@ def list_products(
         category=category,
         has_stock=has_stock,
         id_supplier=id_supplier,
+        imported=imported,
         sort=sort,
         expand_offers=expand_offers,
     )

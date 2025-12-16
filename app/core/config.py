@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     PS_AUTH_VALIDATE_URL: str
     PS_CATEGORIES_URL: str
     PS_BRANDS_URL: str
+    PS_IMPORT_PRODUCT: str
 
     @property
     def database_url(self) -> str:

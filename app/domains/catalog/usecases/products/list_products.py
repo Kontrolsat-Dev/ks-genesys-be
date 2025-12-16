@@ -30,6 +30,7 @@ def execute(
     category: str | None = None,
     has_stock: bool | None = None,
     id_supplier: int | None = None,
+    imported: bool | None = None,
     sort: str = "recent",  # "recent" | "name" | "cheapest" (repo trata disto)
     expand_offers: bool = True,
 ) -> ProductListOut:
@@ -49,6 +50,7 @@ def execute(
         category=category,
         has_stock=has_stock,
         id_supplier=id_supplier,
+        imported=imported,
         sort=sort,
     )
 

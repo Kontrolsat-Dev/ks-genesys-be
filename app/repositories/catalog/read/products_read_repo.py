@@ -86,6 +86,7 @@ class ProductsReadRepository:
         category: str | None = None,
         has_stock: bool | None = None,
         id_supplier: int | None = None,
+        imported: bool | None = None,
     ):
         """
         Aplica os filtros comuns (q, gtin, brand, category, stock, supplier)
@@ -162,6 +163,18 @@ class ProductsReadRepository:
             )
             filters.append(exists_supplier_offer)
 
+        # imported: True = tem id_ecommerce, False = não tem
+        if imported is True:
+            filters.append(Product.id_ecommerce.isnot(None))
+            filters.append(Product.id_ecommerce > 0)
+        elif imported is False:
+            filters.append(
+                or_(
+                    Product.id_ecommerce.is_(None),
+                    Product.id_ecommerce == 0,
+                )
+            )
+
         if filters:
             stmt = stmt.where(and_(*filters))
 
@@ -183,6 +196,7 @@ class ProductsReadRepository:
         category: str | None = None,
         has_stock: bool | None = None,
         id_supplier: int | None = None,
+        imported: bool | None = None,
         sort: str = "recent",  # "recent" | "name" | "cheapest"
     ):
         page = max(1, page)
@@ -202,6 +216,7 @@ class ProductsReadRepository:
             category=category,
             has_stock=has_stock,
             id_supplier=id_supplier,
+            imported=imported,
         )
 
         si = aliased(SupplierItem)

@@ -39,7 +39,7 @@ class PrestashopClient:
         self.validate_url: str | None = getattr(settings, "PS_AUTH_VALIDATE_URL", None)
         self.categories_url: str | None = getattr(settings, "PS_CATEGORIES_URL", None)
         self.brands_url: str | None = getattr(settings, "PS_BRANDS_URL", None)
-        self.products_url: str | None = getattr(settings, "PS_PRODUCTS_URL", None)
+        self.products_url: str | None = getattr(settings, "PS_IMPORT_PRODUCT", None)
         self.header_name: str | None = getattr(settings, "PS_AUTH_VALIDATE_HEADER", None)
         self.genesys_key: str | None = getattr(settings, "PS_GENESYS_KEY", None)
 
@@ -321,7 +321,7 @@ class PrestashopClient:
         Returns dict with id_product and success status.
         """
         if not self.products_url:
-            raise ValueError("PS_PRODUCTS_URL not configured")
+            raise ValueError("PS_IMPORT_PRODUCT not configured")
 
         log.info(
             "ps.create_product name=%s",
