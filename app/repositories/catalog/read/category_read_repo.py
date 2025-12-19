@@ -14,6 +14,10 @@ class CategoryReadRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    def get(self, id_category: int) -> Category | None:
+        """Get category by ID."""
+        return self.db.get(Category, id_category)
+
     def get_by_name(self, name: str) -> Category | None:
         key = normalize_key_ci(name, MAX_NAME_LEN)
         if not key:

@@ -114,3 +114,11 @@
 - CQRS: Repos separados em `read/` e `write/`
 - Domínios: `catalog`, `procurement`, `worker`, `mapping`, `auth`, `prestashop`
 - PrestaShop 1.7.6.7: Campo `upc` determina stock físico vs virtual
+
+
+- Arredondamentos
+[ ] Produtos ate 5€ arredondar sempre para o valor seguinte
+ - 2.83€ > 2.90€
+ - 2.63€ > 2.90€
+ - 20.44€ > 20.40€
+ > Importante e o valor com iva seguir a regra dos 40 e 90  centimos. (50 en 50 centimos)

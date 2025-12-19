@@ -68,29 +68,41 @@ def emit_product_state_event(
             # 1) e 2) têm supplier, preço enviado e stock iguais → não enfileiramos.
             return
 
-    # --- prioridade com base em transição de stock ---
+    # --- prioridade com base em transição de stock e preço ---
     old_stock = None
+    old_price = None
     if prev_active_snapshot is not None:
         old_stock = prev_active_snapshot.get("stock_sent")
+        old_price = prev_active_snapshot.get("unit_price_sent")
 
     new_stock = current.get("stock_sent")
+    new_price = current.get("unit_price_sent")
 
     priority = 5  # default
 
     try:
-        old_i = int(old_stock) if old_stock is not None else None
-        new_i = int(new_stock) if new_stock is not None else None
+        old_stock_i = int(old_stock) if old_stock is not None else None
+        new_stock_i = int(new_stock) if new_stock is not None else None
     except (TypeError, ValueError):
-        old_i = None
-        new_i = None
+        old_stock_i = None
+        new_stock_i = None
 
-    if old_i is not None and new_i is not None:
-        if old_i <= 0 and new_i > 0:
-            # voltou a ter stock
+    # Prioridades (maior = mais urgente):
+    # 10 = saída de stock (produto ficou sem stock)
+    # 9 = reentrada de stock (produto voltou a ter stock)
+    # 8 = alteração de preço (com stock inalterado)
+    # 5 = default (outras alterações)
+
+    if old_stock_i is not None and new_stock_i is not None:
+        if old_stock_i > 0 and new_stock_i == 0:
+            # ficou sem stock - PRIORIDADE MÁXIMA
+            priority = 10
+        elif old_stock_i <= 0 and new_stock_i > 0:
+            # voltou a ter stock - prioridade alta
             priority = 9
-        elif old_i > 0 and new_i == 0:
-            # ficou sem stock
-            priority = 7
+        elif old_price != new_price and old_price is not None and new_price is not None:
+            # preço alterou mas stock não teve transição crítica
+            priority = 8
 
     repo = CatalogUpdateStreamWriteRepository(db)
     repo.enqueue_product_state_change(

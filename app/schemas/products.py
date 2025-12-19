@@ -174,3 +174,32 @@ class ProductFacetsOut(BaseModel):
     brand_ids: list[int] = Field(default_factory=list)
     category_ids: list[int] = Field(default_factory=list)
     supplier_ids: list[int] = Field(default_factory=list)
+
+
+# ----------- BULK IMPORT ---------------
+class BulkImportIn(BaseModel):
+    """Input para importação em bulk de produtos para o PrestaShop."""
+
+    product_ids: list[int] = Field(..., min_length=1, max_length=100)
+    id_ps_category: int | None = Field(
+        None, description="Override de categoria PS para todos os produtos (opcional)"
+    )
+
+
+class BulkImportItemResult(BaseModel):
+    """Resultado da importação de um produto individual."""
+
+    id_product: int
+    success: bool
+    id_ecommerce: int | None = None
+    error: str | None = None
+
+
+class BulkImportOut(BaseModel):
+    """Resultado agregado da importação em bulk."""
+
+    total: int
+    imported: int
+    failed: int
+    skipped: int  # Produtos já importados
+    results: list[BulkImportItemResult] = Field(default_factory=list)

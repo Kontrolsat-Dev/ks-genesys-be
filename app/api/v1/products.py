@@ -27,6 +27,7 @@ from app.domains.catalog.usecases.products.get_product_facets import (
     execute as uc_get_product_facets,
 )
 from app.domains.catalog.usecases.products import import_to_prestashop as uc_import_product
+from app.domains.catalog.usecases.products import bulk_import as uc_bulk_import
 from app.infra.uow import UoW
 from app.schemas.products import (
     ProductDetailOut,
@@ -36,6 +37,8 @@ from app.schemas.products import (
     ProductPriceChangeListOut,
     ProductImportIn,
     ProductImportOut,
+    BulkImportIn,
+    BulkImportOut,
 )
 from app.core.deps import get_prestashop_client
 from app.external.prestashop_client import PrestashopClient
@@ -146,6 +149,32 @@ def get_product_facets(
         has_stock=has_stock,
         id_supplier=id_supplier,
     )
+
+
+@router.post(
+    "/bulk-import",
+    response_model=BulkImportOut,
+    summary="Importar múltiplos produtos para o PrestaShop",
+)
+def bulk_import_products(
+    uow: UowDep,
+    ps_client: Annotated[PrestashopClient, Depends(get_prestashop_client)],
+    payload: BulkImportIn,
+) -> BulkImportOut:
+    """
+    Importa múltiplos produtos para o PrestaShop em batch.
+
+    - Produtos já importados são skipped
+    - Produtos sem categoria PS mapeada falham
+    - Usa a categoria PS da categoria do produto (ou override se fornecido)
+    """
+    result = uc_bulk_import.execute(
+        uow,
+        ps_client,
+        product_ids=payload.product_ids,
+        id_ps_category_override=payload.id_ps_category,
+    )
+    return result
 
 
 @router.get(

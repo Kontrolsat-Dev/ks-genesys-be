@@ -23,6 +23,7 @@ class Category(Base):
     id_ps_category: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     ps_category_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     auto_import: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    auto_import_since: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
