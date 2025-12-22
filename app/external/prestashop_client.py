@@ -316,7 +316,7 @@ class PrestashopClient:
         - partnumber: str | None
         - image_url: str | None
         - weight: str | None
-        - id_brand: int | None (PS brand ID)
+        - brand_name: str | None (brand name to create/match in PS)
 
         Returns dict with id_product and success status.
         """

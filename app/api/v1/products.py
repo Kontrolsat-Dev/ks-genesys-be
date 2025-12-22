@@ -173,6 +173,7 @@ def bulk_import_products(
         ps_client,
         product_ids=payload.product_ids,
         id_ps_category_override=payload.id_ps_category,
+        category_margins=payload.category_margins,
     )
     return result
 

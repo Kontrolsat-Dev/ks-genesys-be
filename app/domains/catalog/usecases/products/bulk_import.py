@@ -24,6 +24,7 @@ def execute(
     *,
     product_ids: list[int],
     id_ps_category_override: int | None = None,
+    category_margins: dict[int, float] | None = None,
 ) -> BulkImportOut:
     """
     Importa múltiplos produtos para o PrestaShop.
@@ -33,6 +34,7 @@ def execute(
         ps_client: Cliente PrestaShop
         product_ids: Lista de IDs de produtos a importar
         id_ps_category_override: Categoria PS para usar em todos (opcional)
+        category_margins: Margens por categoria {id_category: margin_pct} (opcional)
 
     Returns:
         BulkImportOut com resultados agregados
@@ -72,6 +74,15 @@ def execute(
                 )
             )
             continue
+
+        # 2.5) Aplicar margem da categoria se fornecida
+        if category_margins and product.id_category:
+            cat_margin = category_margins.get(product.id_category)
+            if cat_margin is not None:
+                # Converter de percentagem para decimal (25.0 -> 0.25)
+                product.margin = cat_margin / 100.0
+                db.add(product)
+                db.flush()
 
         # 3) Determinar categoria PS
         id_ps_category = id_ps_category_override

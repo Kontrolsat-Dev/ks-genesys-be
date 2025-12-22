@@ -6,6 +6,10 @@ from decimal import Decimal, ROUND_HALF_UP
 from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
 from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
+from app.repositories.catalog.read.brand_read_repo import BrandsReadRepository
+from app.repositories.catalog.write.product_active_offer_write_repo import (
+    ProductActiveOfferWriteRepository,
+)
 from app.repositories.procurement.read.supplier_item_read_repo import SupplierItemReadRepository
 from app.core.errors import NotFound, InvalidArgument
 
@@ -31,7 +35,9 @@ def execute(
     """
     db = uow.db
     prod_r = ProductsReadRepository(db)
+    brand_r = BrandsReadRepository(db)
     item_r = SupplierItemReadRepository(db)
+    active_offer_w = ProductActiveOfferWriteRepository(db)
 
     # Get product
     product = prod_r.get(id_product)
@@ -58,6 +64,7 @@ def execute(
     # Calculate price with margin
     price_str: str | None = None
     stock: int | None = None
+    cost: Decimal | None = None
 
     if best_offer:
         cost = Decimal(best_offer["price"]) if best_offer.get("price") else None
@@ -68,6 +75,13 @@ def execute(
             sale_price = cost * (1 + margin)
             # Round to 2 decimal places
             price_str = str(sale_price.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+    # Get brand name if product has a brand
+    brand_name: str | None = None
+    if product.id_brand:
+        brand = brand_r.get(product.id_brand)
+        if brand:
+            brand_name = brand.name
 
     # Build payload for PrestaShop
     payload = {
@@ -80,7 +94,7 @@ def execute(
         "partnumber": product.partnumber,
         "image_url": product.image_url,
         "weight": product.weight_str,
-        "id_brand": None,  # TODO: map brand to PS brand ID if needed
+        "brand_name": brand_name,
     }
 
     # Call PrestaShop API
@@ -92,6 +106,20 @@ def execute(
         product.id_ecommerce = int(ps_product_id)
         db.add(product)
         db.flush()
+
+        # Update active offer with the imported offer data
+        if best_offer:
+            active_offer_w.upsert(
+                id_product=id_product,
+                id_supplier=best_offer.get("id_supplier"),
+                id_supplier_item=best_offer.get("id") or best_offer.get("id_supplier_item"),
+                unit_cost=float(cost) if cost is not None else None,
+                unit_price_sent=float(price_str) if price_str else None,
+                stock_sent=stock,
+            )
+
+        # Commit all changes (id_ecommerce + active_offer)
+        uow.commit()
 
     return {
         "id_product": id_product,

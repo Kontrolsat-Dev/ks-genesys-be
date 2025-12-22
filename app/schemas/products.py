@@ -184,6 +184,10 @@ class BulkImportIn(BaseModel):
     id_ps_category: int | None = Field(
         None, description="Override de categoria PS para todos os produtos (opcional)"
     )
+    category_margins: dict[int, float] | None = Field(
+        None,
+        description="Margem por categoria: {id_category: margin_percentage}. Ex: {1: 25.0, 2: 30.0}",
+    )
 
 
 class BulkImportItemResult(BaseModel):
