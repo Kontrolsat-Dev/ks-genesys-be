@@ -12,9 +12,14 @@ from app.domains.procurement.usecases.runs.ingest_supplier import (
 from app.domains.catalog.usecases.products.mark_eol_products import (
     execute as uc_mark_eol_products,
 )
+from app.domains.catalog.usecases.products.auto_import_new_products import (
+    execute as uc_auto_import_new_products,
+)
+from app.external.prestashop_client import PrestashopClient
 
 JOB_KIND_SUPPLIER_INGEST = "supplier_ingest"
 JOB_KIND_PRODUCT_EOL_CHECK = "product_eol_check"
+JOB_KIND_PRODUCT_AUTO_IMPORT = "product_auto_import"
 
 JobHandler = Callable[[UoW, dict[str, Any]], Awaitable[None]]
 
@@ -32,9 +37,20 @@ async def handle_product_eol_check(uow: UoW, payload: dict[str, Any]) -> None:
     uc_mark_eol_products(uow)
 
 
+async def handle_product_auto_import(uow: UoW, payload: dict[str, Any]) -> None:
+    """
+    Handler para o job de auto-import de produtos novos.
+    Importa produtos novos em categorias com auto_import ativo.
+    """
+    limit = payload.get("limit", 50)
+    ps_client = PrestashopClient()
+    uc_auto_import_new_products(uow, ps_client, limit=limit)
+
+
 JOB_HANDLERS: dict[str, JobHandler] = {
     JOB_KIND_SUPPLIER_INGEST: handle_supplier_ingest,
     JOB_KIND_PRODUCT_EOL_CHECK: handle_product_eol_check,
+    JOB_KIND_PRODUCT_AUTO_IMPORT: handle_product_auto_import,
 }
 
 

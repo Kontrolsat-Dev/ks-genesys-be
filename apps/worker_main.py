@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from app.background.job_handlers import (
     JOB_KIND_SUPPLIER_INGEST,
     JOB_KIND_PRODUCT_EOL_CHECK,
+    JOB_KIND_PRODUCT_AUTO_IMPORT,
     dispatch_job,
 )
 from app.core.logging import setup_logging
@@ -44,7 +45,11 @@ async def run_worker_loop() -> None:
     logger.info("Starting worker process %s", worker_id)
 
     # Job kinds handled by this worker
-    handled_kinds = [JOB_KIND_SUPPLIER_INGEST, JOB_KIND_PRODUCT_EOL_CHECK]
+    handled_kinds = [
+        JOB_KIND_SUPPLIER_INGEST,
+        JOB_KIND_PRODUCT_EOL_CHECK,
+        JOB_KIND_PRODUCT_AUTO_IMPORT,
+    ]
 
     while True:
         now = _utcnow()
@@ -127,6 +132,13 @@ async def run_worker_loop() -> None:
                 eol_scheduled = _schedule_daily_eol_check(uow, now=now)
                 if eol_scheduled:
                     logger.info("Scheduled daily product_eol_check job")
+                uow.commit()
+
+            # 3c) Scheduler: auto-import de produtos novos (cada 15 minutos)
+            if JOB_KIND_PRODUCT_AUTO_IMPORT in configs:
+                auto_import_scheduled = _schedule_auto_import_job(uow, now=now)
+                if auto_import_scheduled:
+                    logger.info("Scheduled product_auto_import job")
                 uow.commit()
 
             # 4) Executar jobs para cada kind
@@ -291,6 +303,38 @@ def _schedule_daily_eol_check(uow: UoW, *, now: datetime) -> bool:
         job_key=job_key,
         payload={},
         not_before=next_run,
+    )
+
+    return True
+
+
+def _schedule_auto_import_job(uow: UoW, *, now: datetime) -> bool:
+    """
+    Agenda um job de auto-import para correr a cada 15 minutos.
+    Apenas cria novo job se não existir um pendente ou running.
+    Retorna True se um novo job foi criado.
+    """
+    from app.background.job_handlers import JOB_KIND_PRODUCT_AUTO_IMPORT
+    from app.repositories.worker.write.worker_job_write_repo import (
+        WorkerJobWriteRepository,
+    )
+
+    db = uow.db
+    job_w = WorkerJobWriteRepository(db)
+
+    job_key = "product_auto_import:periodic"
+
+    # Verificar se já existe um job pendente ou running
+    existing = job_w.get_pending_or_running_by_key(job_key)
+    if existing:
+        return False
+
+    # Agendar para execução imediata
+    job_w.enqueue_job(
+        job_kind=JOB_KIND_PRODUCT_AUTO_IMPORT,
+        job_key=job_key,
+        payload={"limit": 50},
+        not_before=now,
     )
 
     return True
