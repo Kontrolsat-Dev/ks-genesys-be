@@ -310,8 +310,9 @@ def _schedule_daily_eol_check(uow: UoW, *, now: datetime) -> bool:
 
 def _schedule_auto_import_job(uow: UoW, *, now: datetime) -> bool:
     """
-    Agenda um job de auto-import para correr a cada 15 minutos.
-    Apenas cria novo job se não existir um pendente ou running.
+    Agenda um job de auto-import para correr a cada 4 horas.
+    Apenas cria novo job se não existir um pendente/running e não tiver corrido
+    nas últimas 4 horas.
     Retorna True se um novo job foi criado.
     """
     from app.background.job_handlers import JOB_KIND_PRODUCT_AUTO_IMPORT
@@ -323,17 +324,26 @@ def _schedule_auto_import_job(uow: UoW, *, now: datetime) -> bool:
     job_w = WorkerJobWriteRepository(db)
 
     job_key = "product_auto_import:periodic"
+    interval_hours = 4
 
     # Verificar se já existe um job pendente ou running
     existing = job_w.get_pending_or_running_by_key(job_key)
     if existing:
         return False
 
+    # Verificar se já correu nas últimas 4 horas
+    last_done = job_w.get_last_done_by_key(job_key)
+    if last_done and last_done.finished_at:
+        next_run_at = last_done.finished_at + timedelta(hours=interval_hours)
+        if now < next_run_at:
+            # Ainda não passou tempo suficiente, não agendar
+            return False
+
     # Agendar para execução imediata
     job_w.enqueue_job(
         job_kind=JOB_KIND_PRODUCT_AUTO_IMPORT,
         job_key=job_key,
-        payload={"limit": 50},
+        payload={"limit": 100},  # Processar até 100 produtos por execução
         not_before=now,
     )
 

@@ -57,19 +57,21 @@
 
 ### Phase 1.5: Bulk Import Manual (UI)
 
-- [ ] Criar schemas `BulkImportIn`, `BulkImportOut`
-- [ ] Criar endpoint `POST /products/bulk-import`
-- [ ] Criar usecase `bulk_import.py`
-- [ ] Adicionar checkboxes na tabela de produtos (frontend)
-- [ ] Adicionar botão "Importar Selecionados" (frontend)
-- [ ] Criar modal de confirmação com preview
+- [x] Criar schemas `BulkImportIn`, `BulkImportOut` ✅
+- [x] Criar endpoint `POST /products/bulk-import` ✅
+- [x] Criar usecase `bulk_import.py` ✅
+- [x] Adicionar checkboxes na tabela de produtos (frontend) ✅
+- [x] Adicionar botão "Importar Selecionados" (frontend) ✅
+- [x] Criar modal de confirmação com preview ✅
+- [x] Suporte a margens por categoria (`category_margins`) ✅
 
 ### Phase 2: Auto-Import Worker
 
-- [ ] Adicionar `JOB_KIND_PRODUCT_AUTO_IMPORT` em `job_handlers.py`
-- [ ] Criar usecase `product_auto_import.py`
-- [ ] Registar novo job kind no `worker_main.py`
-- [ ] Configurar scheduling (1-2x por dia)
+- [x] Adicionar `JOB_KIND_PRODUCT_AUTO_IMPORT` em `job_handlers.py` ✅
+- [x] Criar usecase `auto_import_new_products.py` ✅
+- [x] Registar novo job kind no `worker_main.py` ✅
+- [x] Configurar scheduling (4h intervalo) ✅
+- [x] Lógica `auto_import_since` para importar só produtos novos ✅
 
 ### Phase 3: Stock/Price Sync
 

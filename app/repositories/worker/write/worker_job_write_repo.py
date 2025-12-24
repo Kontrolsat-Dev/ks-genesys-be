@@ -192,3 +192,17 @@ class WorkerJobWriteRepository:
             .limit(1)
         )
         return self._db.execute(stmt).scalar_one_or_none() is not None
+
+    def get_last_done_by_key(self, job_key: str) -> WorkerJob | None:
+        """
+        Retorna o último job done com a job_key dada, ordenado por finished_at.
+        Usado para calcular quando fazer a próxima execução.
+        """
+        stmt = (
+            select(WorkerJob)
+            .where(WorkerJob.job_key == job_key)
+            .where(WorkerJob.status == "done")
+            .order_by(WorkerJob.finished_at.desc())
+            .limit(1)
+        )
+        return self._db.execute(stmt).scalar_one_or_none()
