@@ -10,7 +10,7 @@ from app.models.supplier_item import SupplierItem
 from app.models.supplier_feed import SupplierFeed
 
 
-class ProductsReadRepository:
+class ProductReadRepository:
     """
     Consultas de leitura para produtos (inclui joins/filtros com procurement
     apenas no caminho de leitura).

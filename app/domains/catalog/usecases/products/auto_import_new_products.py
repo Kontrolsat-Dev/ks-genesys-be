@@ -16,8 +16,9 @@ from app.external.prestashop_client import PrestashopClient
 from app.models.product import Product
 from app.models.category import Category
 from app.domains.catalog.usecases.products import import_to_prestashop
+from app.domains.audit.services.audit_service import AuditService
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("gsm.catalog.auto_import")
 
 
 @dataclass
@@ -156,5 +157,14 @@ def execute(
         result.failed,
         result.skipped,
     )
+
+    # Audit log (só se houve produtos elegíveis)
+    if result.total_eligible > 0:
+        AuditService(db).log_auto_import(
+            total_eligible=result.total_eligible,
+            imported=result.imported,
+            failed=result.failed,
+            skipped=result.skipped,
+        )
 
     return result

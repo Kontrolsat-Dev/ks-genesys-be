@@ -24,8 +24,7 @@ class CatalogUpdateEventOut(BaseModel):
     created_at: datetime
     payload: CatalogUpdatePayload
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class CatalogUpdateBatchOut(BaseModel):

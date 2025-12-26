@@ -5,10 +5,10 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import InvalidArgument
 from app.core.normalize import normalize_simple, normalize_key_ci
 from app.models.brand import Brand
-from app.repositories.catalog.read.brand_read_repo import BrandsReadRepository, MAX_NAME_LEN
+from app.repositories.catalog.read.brand_read_repo import BrandReadRepository, MAX_NAME_LEN
 
 
-class BrandsWriteRepository(BrandsReadRepository):
+class BrandWriteRepository(BrandReadRepository):
     """
     Reutiliza o 'read' via herança para get/get_required/get_by_name.
     Métodos de escrita fazem apenas mutações + flush (commit fica no use case).

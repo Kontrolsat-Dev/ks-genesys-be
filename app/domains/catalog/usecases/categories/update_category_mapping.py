@@ -1,4 +1,8 @@
 # app/domains/catalog/usecases/categories/update_category_mapping.py
+"""
+UseCase para mapear uma categoria Genesys para PrestaShop.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime, UTC
@@ -6,6 +10,8 @@ from datetime import datetime, UTC
 from app.infra.uow import UoW
 from app.core.errors import NotFound
 from app.models.category import Category
+from app.schemas.categories import CategoryMappingOut
+from app.domains.audit.services.audit_service import AuditService
 
 
 def execute(
@@ -15,12 +21,15 @@ def execute(
     id_ps_category: int,
     ps_category_name: str,
     auto_import: bool,
-) -> Category:
+) -> CategoryMappingOut:
     """
     Mapeia uma categoria Genesys para uma categoria PrestaShop.
 
     Quando auto_import é ativado, define auto_import_since com a data atual
     para que apenas produtos criados a partir desse momento sejam auto-importados.
+
+    Returns:
+        CategoryMappingOut schema
     """
     db = uow.db
     cat = db.get(Category, id_category)
@@ -42,4 +51,14 @@ def execute(
         cat.auto_import_since = None
 
     uow.commit()
-    return cat
+
+    # Audit log
+    AuditService(db).log_category_mapping(
+        category_id=id_category,
+        category_name=cat.name,
+        ps_category_id=id_ps_category,
+        ps_category_name=ps_category_name,
+        auto_import=auto_import,
+    )
+
+    return CategoryMappingOut.model_validate(cat)

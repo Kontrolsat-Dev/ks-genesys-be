@@ -50,8 +50,7 @@ class SupplierOut(BaseModel):
     ingest_interval_minutes: int | None = None
     ingest_next_run_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class SupplierList(BaseModel):

@@ -10,14 +10,14 @@ from app.domains.catalog.services.active_offer import (
     recalculate_active_offer_for_product,
 )
 from app.domains.catalog.services.sync_events import emit_product_state_event
-from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 
 log = logging.getLogger("gsm.ingest")
 
 
 def sync_active_offer_for_products(
     db: Session,
-    prod_r: ProductsReadRepository,
+    prod_r: ProductReadRepository,
     *,
     affected_products: Iterable[int],
     reason: str = "ingest_supplier",

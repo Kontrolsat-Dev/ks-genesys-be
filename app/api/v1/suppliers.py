@@ -52,8 +52,7 @@ def list_suppliers(
     Lista todos os fornecedores com paginação e pesquisa opcional.
     Inclui informação básica de cada fornecedor.
     """
-    items, total = uc_q_list(uow, search=search, page=page, page_size=page_size)
-    return {"items": items, "total": total, "page": page, "page_size": page_size}
+    return uc_q_list(uow, search=search, page=page, page_size=page_size)
 
 
 @router.get(

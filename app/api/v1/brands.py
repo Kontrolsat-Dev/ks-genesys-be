@@ -24,5 +24,4 @@ def list_brands(
     """
     Lista as marcas.
     """
-    items, total = uc_list.execute(uow, search=search, page=page, page_size=page_size)
-    return {"items": items, "total": total, "page": page, "page_size": page_size}
+    return uc_list.execute(uow, search=search, page=page, page_size=page_size)

@@ -1,15 +1,29 @@
+# app/domains/procurement/usecases/suppliers/list_suppliers.py
+"""
+UseCase para listar fornecedores com paginação e pesquisa.
+"""
+
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 from app.infra.uow import UoW
-from app.models.supplier import Supplier
 from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
+from app.schemas.suppliers import SupplierList, SupplierOut
 
 
-def execute(
-    uow: UoW, *, search: str | None, page: int, page_size: int
-) -> tuple[Sequence[Supplier], int]:
+def execute(uow: UoW, *, search: str | None, page: int, page_size: int) -> SupplierList:
+    """
+    Lista fornecedores com paginação e pesquisa opcional.
+
+    Returns:
+        SupplierList schema
+    """
     db = uow.db
     repo = SupplierReadRepository(db)
-    return repo.search_paginated(search, page, page_size)
+    items, total = repo.search_paginated(search, page, page_size)
+
+    return SupplierList(
+        items=[SupplierOut.model_validate(s) for s in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )

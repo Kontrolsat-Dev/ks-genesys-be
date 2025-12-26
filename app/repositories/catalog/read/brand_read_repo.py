@@ -11,7 +11,7 @@ from app.core.normalize import normalize_key_ci
 MAX_NAME_LEN = 200
 
 
-class BrandsReadRepository:
+class BrandReadRepository:
     def __init__(self, db: Session):
         self.db = db
 

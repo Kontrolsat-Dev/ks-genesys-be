@@ -9,7 +9,7 @@ from app.models.product_meta import ProductMeta
 
 # Importes de write repos para garantir criação de brand/category quando em falta.
 # (usa import local para evitar ciclos, se necessário)
-from app.repositories.catalog.write.brand_write_repo import BrandsWriteRepository
+from app.repositories.catalog.write.brand_write_repo import BrandWriteRepository
 from app.repositories.catalog.write.category_write_repo import CategoryWriteRepository
 
 
@@ -25,7 +25,7 @@ class ProductWriteRepository:
 
     # --- Lookups auxiliares para writes (CQRS pragmático) ----------
     # Usados internamente antes de operações de escrita.
-    # Para queries ricas de leitura, usar ProductsReadRepository.
+    # Para queries ricas de leitura, usar ProductReadRepository.
     def get(self, id_product: int) -> Product | None:
         return self.db.get(Product, id_product)
 
@@ -67,7 +67,7 @@ class ProductWriteRepository:
             * NÃO cai para brand+mpn
 
         - Se NÃO há GTIN → aí sim usamos brand+MPN para dedupe:
-            * cria/resolve brand por nome (BrandsWriteRepository)
+            * cria/resolve brand por nome (BrandWriteRepository)
             * tenta get_by_brand_mpn(id_brand, partnumber)
             * se não existir → cria produto sem GTIN
 
@@ -88,7 +88,7 @@ class ProductWriteRepository:
             # opcionalmente ainda podemos associar brand se vier no feed
             id_brand = None
             if brand_norm:
-                id_brand = BrandsWriteRepository(self.db).get_or_create(brand_norm).id
+                id_brand = BrandWriteRepository(self.db).get_or_create(brand_norm).id
 
             p = Product(
                 gtin=gtin_norm,
@@ -103,7 +103,7 @@ class ProductWriteRepository:
         # 2) Sem GTIN → podemos usar brand+MPN como chave
         id_brand = None
         if brand_norm:
-            id_brand = BrandsWriteRepository(self.db).get_or_create(brand_norm).id
+            id_brand = BrandWriteRepository(self.db).get_or_create(brand_norm).id
 
         # Sem GTIN e sem (brand+mpn) ⇒ não temos chave
         if not (id_brand and part_norm):
@@ -153,7 +153,7 @@ class ProductWriteRepository:
             return
         changed = False
         if brand_name and not p.id_brand:
-            p.id_brand = BrandsWriteRepository(self.db).get_or_create(brand_name).id
+            p.id_brand = BrandWriteRepository(self.db).get_or_create(brand_name).id
             changed = True
         if category_name and not p.id_category:
             p.id_category = (

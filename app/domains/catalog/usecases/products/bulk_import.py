@@ -10,12 +10,13 @@ import logging
 
 from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
-from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 from app.repositories.catalog.read.category_read_repo import CategoryReadRepository
 from app.schemas.products import BulkImportOut, BulkImportItemResult
 from app.domains.catalog.usecases.products import import_to_prestashop
+from app.domains.audit.services.audit_service import AuditService
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("gsm.catalog.bulk_import")
 
 
 def execute(
@@ -40,7 +41,7 @@ def execute(
         BulkImportOut com resultados agregados
     """
     db = uow.db
-    prod_repo = ProductsReadRepository(db)
+    prod_repo = ProductReadRepository(db)
     cat_repo = CategoryReadRepository(db)
 
     results: list[BulkImportItemResult] = []
@@ -132,6 +133,14 @@ def execute(
             log.warning("Falha ao importar produto %d: %s", pid, e)
 
     db.commit()
+
+    # Audit log
+    AuditService(db).log_bulk_import(
+        total=len(product_ids),
+        imported=imported,
+        failed=failed,
+        skipped=skipped,
+    )
 
     return BulkImportOut(
         total=len(product_ids),

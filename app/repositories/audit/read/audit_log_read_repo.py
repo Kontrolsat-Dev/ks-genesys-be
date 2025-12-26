@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.audit_log import AuditLog
 
 
-class AuditLogReadRepo:
+class AuditLogReadRepository:
     def __init__(self, db: Session):
         self.db = db
 

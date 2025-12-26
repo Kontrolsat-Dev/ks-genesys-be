@@ -16,7 +16,7 @@ from app.domains.procurement.services import (
 )
 from app.external.feed_downloader import FeedDownloader
 from app.infra.uow import UoW
-from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
 from app.repositories.procurement.read.feed_run_read_repo import FeedRunReadRepository
 from app.repositories.procurement.read.mapper_read_repo import MapperReadRepository
@@ -63,7 +63,7 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
     sup_r = SupplierReadRepository(db)
     feed_r = SupplierFeedReadRepository(db)
     mapper_r = MapperReadRepository(db)
-    prod_r = ProductsReadRepository(db)
+    prod_r = ProductReadRepository(db)
 
     prod_w = ProductWriteRepository(db)
     item_w = SupplierItemWriteRepository(db)

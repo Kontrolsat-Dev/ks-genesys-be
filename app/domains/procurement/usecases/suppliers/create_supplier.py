@@ -1,20 +1,27 @@
+# app/domains/procurement/usecases/suppliers/create_supplier.py
+"""
+UseCase para criar um novo fornecedor.
+"""
+
 from __future__ import annotations
 
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import BadRequest, Conflict, InvalidArgument
 from app.infra.uow import UoW
-from app.models.supplier import Supplier
 from app.repositories.procurement.write.supplier_write_repo import SupplierWriteRepository
-from app.schemas.suppliers import SupplierCreate
+from app.schemas.suppliers import SupplierCreate, SupplierOut
 
 
-def execute(uow: UoW, *, data: SupplierCreate) -> Supplier:
+def execute(uow: UoW, *, data: SupplierCreate) -> SupplierOut:
     """
-    Create a supplier and commit via UoW.
+    Cria um fornecedor e faz commit via UoW.
 
     Toda a lógica de normalização/unique fica no SupplierWriteRepository.create.
     Aqui só gerimos a transação e mapeamos erros para AppErrors.
+
+    Returns:
+        SupplierOut schema
     """
     db = uow.db
     repo = SupplierWriteRepository(db)
@@ -22,7 +29,7 @@ def execute(uow: UoW, *, data: SupplierCreate) -> Supplier:
     try:
         entity = repo.create(data)
         uow.commit()
-        return entity
+        return SupplierOut.model_validate(entity)
 
     except (InvalidArgument, Conflict):
         # erros de domínio conhecidos → apenas rollback e rethrow

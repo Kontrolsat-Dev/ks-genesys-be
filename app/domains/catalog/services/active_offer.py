@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 from app.repositories.catalog.write.product_active_offer_write_repo import (
     ProductActiveOfferWriteRepository,
 )
@@ -126,7 +126,7 @@ def recalculate_active_offer_for_product(
     - Se não existir nenhuma oferta → limpa supplier/item/preço e stock=0.
     """
     pao_repo = ProductActiveOfferWriteRepository(db)
-    p_repo = ProductsReadRepository(db)
+    p_repo = ProductReadRepository(db)
 
     margin = p_repo.get_product_margin(id_product)
     best = choose_active_offer_candidate(db, id_product=id_product)

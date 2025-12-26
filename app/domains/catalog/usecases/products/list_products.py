@@ -9,7 +9,7 @@ from app.infra.uow import UoW
 from app.repositories.catalog.read.product_active_offer_read_repo import (
     ProductActiveOfferReadRepository,
 )
-from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 from app.repositories.procurement.read.supplier_item_read_repo import (
     SupplierItemReadRepository,
 )
@@ -37,7 +37,7 @@ def execute(
     db = uow.db
 
     # 1) obter produtos paginados
-    repo = ProductsReadRepository(db)
+    repo = ProductReadRepository(db)
     rows, total = repo.list_products(
         page=page,
         page_size=page_size,

@@ -7,7 +7,7 @@ from typing import Any
 from app.infra.base import utcnow
 from app.infra.uow import UoW
 from app.core.config import settings
-from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
 from app.repositories.procurement.read.product_event_read_repo import ProductEventReadRepository
 from app.repositories.catalog.write.catalog_update_stream_write_repo import (
@@ -35,7 +35,7 @@ def execute(uow: UoW, *, as_of: datetime | None = None) -> dict[str, Any]:
     cutoff = now - timedelta(days=EOL_THRESHOLD_DAYS)
 
     events_r = ProductEventReadRepository(db)
-    prod_r = ProductsReadRepository(db)
+    prod_r = ProductReadRepository(db)
     prod_w = ProductWriteRepository(db)
     stream_w = CatalogUpdateStreamWriteRepository(db)
 

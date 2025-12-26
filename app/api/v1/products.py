@@ -378,10 +378,9 @@ def import_product_to_prestashop(
     - Envia dados para a API do PrestaShop (r_genesys module)
     - Actualiza o product.id_ecommerce com o ID do PS
     """
-    result = uc_import_product.execute(
+    return uc_import_product.execute(
         uow,
         ps_client,
         id_product=id_product,
         id_ps_category=payload.id_ps_category,
     )
-    return ProductImportOut(**result)

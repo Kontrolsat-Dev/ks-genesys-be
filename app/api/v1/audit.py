@@ -5,7 +5,6 @@ API endpoints para audit logs.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from typing import Annotated
 
@@ -36,20 +35,13 @@ def list_audit_logs(
     """
     Lista audit logs com filtros e paginação.
     """
-    items, total = list_logs.execute(
+    return list_logs.execute(
         uow,
         event_type=event_type,
         entity_type=entity_type,
         entity_id=entity_id,
         from_date=from_date,
         to_date=to_date,
-        page=page,
-        page_size=page_size,
-    )
-
-    return AuditLogListResponse(
-        items=[_to_out(log) for log in items],
-        total=total,
         page=page,
         page_size=page_size,
     )
@@ -69,27 +61,4 @@ def get_audit_log(_user: UserDep, uow: UowDep, log_id: int):
     """
     Obtém detalhes de um audit log.
     """
-    log = get_log.execute(uow, log_id)
-    return _to_out(log)
-
-
-def _to_out(log) -> AuditLogOut:
-    """Converte modelo para schema de output."""
-    details = None
-    if log.details_json:
-        try:
-            details = json.loads(log.details_json)
-        except json.JSONDecodeError:
-            details = {"raw": log.details_json}
-
-    return AuditLogOut(
-        id=log.id,
-        event_type=log.event_type,
-        entity_type=log.entity_type,
-        entity_id=log.entity_id,
-        actor_id=log.actor_id,
-        actor_name=log.actor_name,
-        description=log.description,
-        details=details,
-        created_at=log.created_at,
-    )
+    return get_log.execute(uow, log_id)

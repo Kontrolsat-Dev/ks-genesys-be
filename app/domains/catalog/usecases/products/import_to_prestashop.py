@@ -1,17 +1,23 @@
 # app/domains/catalog/usecases/products/import_to_prestashop.py
+"""
+UseCase para importar um produto para o PrestaShop.
+"""
+
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
 
 from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
-from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
-from app.repositories.catalog.read.brand_read_repo import BrandsReadRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
+from app.repositories.catalog.read.brand_read_repo import BrandReadRepository
 from app.repositories.catalog.write.product_active_offer_write_repo import (
     ProductActiveOfferWriteRepository,
 )
 from app.repositories.procurement.read.supplier_item_read_repo import SupplierItemReadRepository
 from app.core.errors import NotFound, InvalidArgument
+from app.domains.audit.services.audit_service import AuditService
+from app.schemas.products import ProductImportOut
 
 
 def execute(
@@ -20,26 +26,28 @@ def execute(
     *,
     id_product: int,
     id_ps_category: int,
-) -> dict:
+) -> ProductImportOut:
     """
-    Import a product to PrestaShop.
+    Importa um produto para o PrestaShop.
 
-    1. Get product from database
-    2. Get best offer (lowest price with stock > 0)
-    3. Calculate sale price = cost * (1 + margin)
-    4. Build product payload
-    5. Call PrestaShop API to create product
-    6. Update product with id_ecommerce
+    Passos:
+    1. Obter produto da base de dados
+    2. Obter melhor oferta (menor preço)
+    3. Calcular preço de venda = custo * (1 + margem)
+    4. Construir payload para PrestaShop
+    5. Chamar API do PrestaShop
+    6. Atualizar produto com id_ecommerce
 
-    Returns the PS response with id_product.
+    Returns:
+        ProductImportOut schema
     """
     db = uow.db
-    prod_r = ProductsReadRepository(db)
-    brand_r = BrandsReadRepository(db)
+    prod_r = ProductReadRepository(db)
+    brand_r = BrandReadRepository(db)
     item_r = SupplierItemReadRepository(db)
     active_offer_w = ProductActiveOfferWriteRepository(db)
 
-    # Get product
+    # Obter produto
     product = prod_r.get(id_product)
     if not product:
         raise NotFound(f"Product {id_product} not found")
@@ -49,19 +57,19 @@ def execute(
             f"Product {id_product} already imported (PS ID: {product.id_ecommerce})"
         )
 
-    # Get offers and find best one (lowest price, regardless of stock)
+    # Obter ofertas e encontrar a melhor (menor preço)
     offers = item_r.list_offers_for_product(id_product, only_in_stock=False)
 
     best_offer = None
     if offers:
-        # Sort by price ascending and pick the lowest
+        # Ordenar por preço ascendente e escolher o menor
         offers_sorted = sorted(
             offers,
             key=lambda o: Decimal(o["price"]) if o.get("price") else Decimal("999999"),
         )
         best_offer = offers_sorted[0] if offers_sorted else None
 
-    # Calculate price with margin
+    # Calcular preço com margem
     price_str: str | None = None
     stock: int | None = None
     cost: Decimal | None = None
@@ -80,14 +88,14 @@ def execute(
                 Decimal(str(sale_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             )
 
-    # Get brand name if product has a brand
+    # Obter nome da marca se o produto tiver marca
     brand_name: str | None = None
     if product.id_brand:
         brand = brand_r.get(product.id_brand)
         if brand:
             brand_name = brand.name
 
-    # Build payload for PrestaShop
+    # Construir payload para PrestaShop
     payload = {
         "name": product.name or f"Product #{product.id}",
         "description": product.description or "",
@@ -101,17 +109,17 @@ def execute(
         "brand_name": brand_name,
     }
 
-    # Call PrestaShop API
+    # Chamar API do PrestaShop
     result = ps_client.create_product(payload)
 
-    # Update product with PS ID
+    # Atualizar produto com ID do PrestaShop
     ps_product_id = result.get("id_product")
     if ps_product_id:
         product.id_ecommerce = int(ps_product_id)
         db.add(product)
         db.flush()
 
-        # Update active offer with the imported offer data
+        # Atualizar active offer com dados da oferta importada
         if best_offer:
             active_offer_w.upsert(
                 id_product=id_product,
@@ -122,14 +130,18 @@ def execute(
                 stock_sent=stock,
             )
 
-        # Commit all changes (id_ecommerce + active_offer)
+        # Commit de todas as alterações
         uow.commit()
 
-    return {
-        "id_product": id_product,
-        "id_ecommerce": ps_product_id,
-        "success": True,
-        "price_sent": price_str,
-        "stock_sent": stock,
-        **result,
-    }
+        # Registar no audit log
+        AuditService(db).log_product_import(
+            product_id=id_product,
+            product_name=product.name,
+            id_ecommerce=ps_product_id,
+        )
+
+    return ProductImportOut(
+        id_product=id_product,
+        id_ecommerce=ps_product_id,
+        success=True,
+    )

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.core.errors import NotFound
+
 from app.domains.catalog.services.mappers import (
     map_product_row_to_out,
     map_offer_row_to_out,
@@ -12,7 +14,7 @@ from app.repositories.catalog.read.product_active_offer_read_repo import (
     ProductActiveOfferReadRepository,
 )
 from app.repositories.catalog.read.product_meta_read_repo import ProductMetaReadRepository
-from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 from app.repositories.procurement.read.product_event_read_repo import (
     ProductEventReadRepository,
 )
@@ -45,10 +47,10 @@ def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> Pro
     db = uow.db
 
     # 1) produto + nomes agregados
-    p_repo = ProductsReadRepository(db)
+    p_repo = ProductReadRepository(db)
     row = p_repo.get_product_with_names(id_product)
     if not row:
-        raise ValueError(f"Product {id_product} not found")
+        raise NotFound(f"Product {id_product} not found")
 
     p: ProductOut = map_product_row_to_out(row)
 

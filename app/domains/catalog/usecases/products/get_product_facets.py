@@ -1,7 +1,7 @@
 # app/domains/catalog/usecases/products/get_product_facets.py
 
 from app.infra.uow import UoW
-from app.repositories.catalog.read.products_read_repo import ProductsReadRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 from app.schemas.products import ProductFacetsOut
 
 
@@ -19,7 +19,7 @@ def execute(
     id_supplier: int | None = None,
 ) -> ProductFacetsOut:
     db = uow.db
-    repo = ProductsReadRepository(db)
+    repo = ProductReadRepository(db)
 
     brand_ids, category_ids, supplier_ids = repo.get_facets(
         q=q,
