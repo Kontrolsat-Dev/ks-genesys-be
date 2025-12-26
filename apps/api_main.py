@@ -20,6 +20,7 @@ from app.api.v1.categories import router as categories_router
 from app.api.v1.catalog_update_stream import router as catalog_updates_router
 from app.api.v1.worker_jobs import router as worker_jobs_router
 from app.api.v1.prestashop import router as prestashop_router
+from app.api.v1.config import router as config_router
 
 # Routes
 from app.api.v1.system import router as system_router
@@ -60,6 +61,7 @@ async def on_startup():
 app.include_router(system_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(prestashop_router, prefix="/api/v1")
+app.include_router(config_router, prefix="/api/v1")
 app.include_router(suppliers_router, prefix="/api/v1")
 app.include_router(feeds_router, prefix="/api/v1")
 app.include_router(mappers_router, prefix="/api/v1")

@@ -76,11 +76,15 @@ async def run_worker_loop() -> None:
                 if job_kind not in handled_kinds:
                     continue
 
-                # Para supplier_ingest assumimos jobs longos → default mais generoso
+                # Obter stale timeouts da configuração
+                from app.domains.config.services.config_service import config_service
+
                 if job_kind == JOB_KIND_SUPPLIER_INGEST:
-                    default_stale = 3600  # 1 hora (ajusta para 2h se precisares)
+                    default_stale = config_service.get_int(
+                        "stale_job_timeout_supplier_ingest", default=3600
+                    )
                 else:
-                    default_stale = 600  # 10 minutos para outros job kinds
+                    default_stale = config_service.get_int("stale_job_timeout_default", default=600)
 
                 stale_after_seconds = getattr(cfg, "stale_after_seconds", None) or default_stale
                 backoff_seconds = cfg.backoff_seconds
@@ -112,7 +116,10 @@ async def run_worker_loop() -> None:
             )
 
             run_w = FeedRunWriteRepository(db)
-            stale_runs = run_w.mark_stale_running_as_error(stale_after_minutes=120)
+            stale_feed_timeout = config_service.get_int(
+                "stale_feed_run_timeout_minutes", default=120
+            )
+            stale_runs = run_w.mark_stale_running_as_error(stale_after_minutes=stale_feed_timeout)
             if stale_runs:
                 logger.warning(
                     "Marked %d stale FeedRun(s) as error (>2h running)",
@@ -324,7 +331,10 @@ def _schedule_auto_import_job(uow: UoW, *, now: datetime) -> bool:
     job_w = WorkerJobWriteRepository(db)
 
     job_key = "product_auto_import:periodic"
-    interval_hours = 4
+
+    from app.domains.config.services.config_service import config_service
+
+    interval_hours = config_service.get_int("auto_import_interval_hours", default=4)
 
     # Verificar se já existe um job pendente ou running
     existing = job_w.get_pending_or_running_by_key(job_key)

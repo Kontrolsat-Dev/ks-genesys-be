@@ -78,7 +78,15 @@ def emit_product_state_event(
     new_stock = current.get("stock_sent")
     new_price = current.get("unit_price_sent")
 
-    priority = 5  # default
+    # Obter prioridades da configuração
+    from app.domains.config.services.config_service import config_service
+
+    priority_default = config_service.get_int("priority_default", default=5)
+    priority_price_change = config_service.get_int("priority_price_change", default=8)
+    priority_stock_reentry = config_service.get_int("priority_stock_reentry", default=9)
+    priority_stock_out = config_service.get_int("priority_stock_out", default=10)
+
+    priority = priority_default
 
     try:
         old_stock_i = int(old_stock) if old_stock is not None else None
@@ -87,22 +95,18 @@ def emit_product_state_event(
         old_stock_i = None
         new_stock_i = None
 
-    # Prioridades (maior = mais urgente):
-    # 10 = saída de stock (produto ficou sem stock)
-    # 9 = reentrada de stock (produto voltou a ter stock)
-    # 8 = alteração de preço (com stock inalterado)
-    # 5 = default (outras alterações)
+    # Prioridades (maior = mais urgente)
 
     if old_stock_i is not None and new_stock_i is not None:
         if old_stock_i > 0 and new_stock_i == 0:
             # ficou sem stock - PRIORIDADE MÁXIMA
-            priority = 10
+            priority = priority_stock_out
         elif old_stock_i <= 0 and new_stock_i > 0:
             # voltou a ter stock - prioridade alta
-            priority = 9
+            priority = priority_stock_reentry
         elif old_price != new_price and old_price is not None and new_price is not None:
             # preço alterou mas stock não teve transição crítica
-            priority = 8
+            priority = priority_price_change
 
     repo = CatalogUpdateStreamWriteRepository(db)
     repo.enqueue_product_state_change(

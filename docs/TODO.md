@@ -99,6 +99,18 @@
 - [ ] UI para visualizar relatórios
 
 ---
+## Configurações de plataforma
+- [ ] Guardar configurações de plataforma em banco de dados
+- [ ] UI para visualizar configurações de plataforma
+---
+## Notificações por utilizador
+- [ ] Implementar notificações de stock
+- [ ] Implementar notificações de preço
+- [ ] Implementar notificações de importação
+- [ ] Implementar notificações de EOL
+- [ ] Outras notificações que sejam pretinentes para o utilizador
+
+---
 
 ## Dropshipping (Futuro)
 
@@ -119,8 +131,7 @@
 
 
 - Arredondamentos
-[ ] Produtos ate 5€ arredondar sempre para o valor seguinte
- - 2.83€ > 2.90€
- - 2.63€ > 2.90€
- - 20.44€ > 20.40€
- > Importante e o valor com iva seguir a regra dos 40 e 90  centimos. (50 en 50 centimos)
+[x] Produtos com preço arredondado para .40 ou .90 (c/ IVA) ✅
+ - Implementado em: `price_rounding.py`
+ - Integrado em: `active_offer.py`, `catalog_update_stream_write_repo.py`
+ - Frontend: `margin-preview-card.tsx` com preview visual

@@ -16,6 +16,7 @@ from .product_active_offer import ProductActiveOffer
 from .catalog_update_stream import CatalogUpdateStream
 from .worker_activity_config import WorkerActivityConfig
 from .worker_job import WorkerJob
+from .platform_config import PlatformConfig
 
 __all__ = [
     "Base",
@@ -36,6 +37,7 @@ __all__ = [
     "CatalogUpdateStream",
     "WorkerActivityConfig",
     "WorkerJob",
+    "PlatformConfig",
 ]
 
 

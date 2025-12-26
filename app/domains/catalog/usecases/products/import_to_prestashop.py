@@ -71,10 +71,14 @@ def execute(
         stock = best_offer.get("stock") or 0
 
         if cost is not None:
+            from app.domains.catalog.services.price_rounding import round_to_pretty_price
+
             margin = Decimal(str(product.margin or 0))
-            sale_price = cost * (1 + margin)
-            # Round to 2 decimal places
-            price_str = str(sale_price.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+            raw_sale_price = float(cost * (1 + margin))
+            sale_price = round_to_pretty_price(raw_sale_price)
+            price_str = str(
+                Decimal(str(sale_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            )
 
     # Get brand name if product has a brand
     brand_name: str | None = None

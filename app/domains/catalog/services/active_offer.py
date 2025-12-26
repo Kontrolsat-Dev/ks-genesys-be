@@ -151,7 +151,10 @@ def recalculate_active_offer_for_product(
 
     unit_price_sent: float | None = None
     try:
-        unit_price_sent = round(unit_cost * (1 + margin), 2)
+        from app.domains.catalog.services.price_rounding import round_to_pretty_price
+
+        raw_price = unit_cost * (1 + margin)
+        unit_price_sent = round_to_pretty_price(raw_price)
     except TypeError:
         # margin devia vir sempre normalizada, mas se der porcaria: preço = custo
         unit_price_sent = unit_cost

@@ -44,7 +44,10 @@ class CatalogUpdateStreamWriteRepository:
             unit_price_sent = active_offer.unit_price_sent
 
             if unit_price_sent is None and active_offer.unit_cost is not None:
-                unit_price_sent = round(active_offer.unit_cost * (1 + margin), 2)
+                from app.domains.catalog.services.price_rounding import round_to_pretty_price
+
+                raw_price = active_offer.unit_cost * (1 + margin)
+                unit_price_sent = round_to_pretty_price(raw_price)
 
         return {
             "reason": reason,
