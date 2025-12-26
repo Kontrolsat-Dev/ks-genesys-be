@@ -10,6 +10,7 @@ from app.infra.bootstrap import ensure_recurring_jobs
 
 
 from app.api.v1.auth import router as auth_router
+from app.api.v1.audit import router as audit_router
 from app.api.v1.feeds import router as feeds_router
 from app.api.v1.mappers import router as mappers_router
 from app.api.v1.products import router as products_router
@@ -60,6 +61,7 @@ async def on_startup():
 # routers
 app.include_router(system_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(audit_router, prefix="/api/v1")
 app.include_router(prestashop_router, prefix="/api/v1")
 app.include_router(config_router, prefix="/api/v1")
 app.include_router(suppliers_router, prefix="/api/v1")

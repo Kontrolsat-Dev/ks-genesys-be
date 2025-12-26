@@ -24,7 +24,7 @@ from app.schemas.config import (
     PlatformConfigSeedOut,
 )
 
-router = APIRouter(prefix="/config", tags=["Config"])
+router = APIRouter(prefix="/config", tags=["config"])
 
 
 @router.get("", response_model=PlatformConfigListOut)

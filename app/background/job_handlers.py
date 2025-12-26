@@ -41,10 +41,10 @@ async def handle_product_auto_import(uow: UoW, payload: dict[str, Any]) -> None:
     """
     Handler para o job de auto-import de produtos novos.
     Importa produtos novos em categorias com auto_import ativo.
+    O batch_size é obtido da configuração (auto_import_batch_limit).
     """
-    limit = payload.get("limit", 50)
     ps_client = PrestashopClient()
-    uc_auto_import_new_products(uow, ps_client, limit=limit)
+    uc_auto_import_new_products(uow, ps_client)
 
 
 JOB_HANDLERS: dict[str, JobHandler] = {

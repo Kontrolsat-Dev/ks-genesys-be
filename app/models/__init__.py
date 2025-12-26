@@ -1,6 +1,7 @@
 # app/models/__init__.py
 from app.infra.base import Base  # re-export
 
+from .audit_log import AuditLog
 from .brand import Brand
 from .category import Category
 from .enums import FEED_FORMAT, FEED_KIND, RUN_STATUS
@@ -20,6 +21,7 @@ from .platform_config import PlatformConfig
 
 __all__ = [
     "Base",
+    "AuditLog",
     "Brand",
     "Category",
     "FEED_KIND",

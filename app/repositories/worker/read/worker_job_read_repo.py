@@ -54,7 +54,7 @@ class WorkerJobReadRepository:
     def list_jobs(
         self,
         *,
-        job_kind: str,
+        job_kind: str | None = None,
         status: str | None = None,
         page: int = 1,
         page_size: int = 50,
