@@ -194,3 +194,163 @@ class AuditService:
                 "skipped": skipped,
             },
         )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Supplier events
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def log_supplier_create(
+        self,
+        supplier_id: int,
+        supplier_name: str,
+        actor_id: str | None = None,
+        actor_name: str | None = None,
+    ) -> AuditLog:
+        """Regista criação de fornecedor."""
+        return self.log(
+            "supplier_create",
+            entity_type="supplier",
+            entity_id=supplier_id,
+            actor_id=actor_id,
+            actor_name=actor_name,
+            description=f"Fornecedor '{supplier_name}' criado",
+            details={"supplier_name": supplier_name},
+        )
+
+    def log_supplier_update(
+        self,
+        supplier_id: int,
+        supplier_name: str,
+        changes: dict[str, Any] | None = None,
+        actor_id: str | None = None,
+        actor_name: str | None = None,
+    ) -> AuditLog:
+        """Regista atualização de fornecedor."""
+        return self.log(
+            "supplier_update",
+            entity_type="supplier",
+            entity_id=supplier_id,
+            actor_id=actor_id,
+            actor_name=actor_name,
+            description=f"Fornecedor '{supplier_name}' atualizado",
+            details={"supplier_name": supplier_name, "changes": changes},
+        )
+
+    def log_supplier_delete(
+        self,
+        supplier_id: int,
+        supplier_name: str,
+        actor_id: str | None = None,
+        actor_name: str | None = None,
+    ) -> AuditLog:
+        """Regista eliminação de fornecedor."""
+        return self.log(
+            "supplier_delete",
+            entity_type="supplier",
+            entity_id=supplier_id,
+            actor_id=actor_id,
+            actor_name=actor_name,
+            description=f"Fornecedor '{supplier_name}' eliminado",
+            details={"supplier_name": supplier_name},
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Category events
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def log_category_mapping_delete(
+        self,
+        category_id: int,
+        category_name: str | None,
+        actor_id: str | None = None,
+        actor_name: str | None = None,
+    ) -> AuditLog:
+        """Regista remoção de mapeamento de categoria."""
+        return self.log(
+            "category_mapping_delete",
+            entity_type="category",
+            entity_id=category_id,
+            actor_id=actor_id,
+            actor_name=actor_name,
+            description=f"Mapeamento da categoria '{category_name}' removido",
+            details={"category_name": category_name},
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Product events
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def log_product_margin_update(
+        self,
+        product_id: int,
+        product_name: str | None,
+        old_margin: float | None,
+        new_margin: float | None,
+        actor_id: str | None = None,
+        actor_name: str | None = None,
+    ) -> AuditLog:
+        """Regista alteração de margem de produto."""
+        return self.log(
+            "product_margin_update",
+            entity_type="product",
+            entity_id=product_id,
+            actor_id=actor_id,
+            actor_name=actor_name,
+            description=f"Margem do produto '{product_name}' alterada de {old_margin} para {new_margin}",
+            details={
+                "product_name": product_name,
+                "old_margin": old_margin,
+                "new_margin": new_margin,
+            },
+        )
+
+    def log_product_eol_marked(
+        self,
+        products_marked: int,
+        events_enqueued: int,
+    ) -> AuditLog:
+        """Regista produtos marcados como EOL."""
+        return self.log(
+            "product_eol_marked",
+            entity_type="product",
+            actor_id="system",
+            actor_name="Worker",
+            description=f"EOL check: {products_marked} produtos marcados, {events_enqueued} eventos enfileirados",
+            details={
+                "products_marked": products_marked,
+                "events_enqueued": events_enqueued,
+            },
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Ingest events
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def log_ingest_complete(
+        self,
+        supplier_id: int,
+        supplier_name: str | None,
+        run_id: int,
+        rows_processed: int,
+        products_created: int = 0,
+        products_updated: int = 0,
+        errors: int = 0,
+    ) -> AuditLog:
+        """Regista conclusão de ingest de fornecedor."""
+        return self.log(
+            "ingest_complete",
+            entity_type="feed_run",
+            entity_id=run_id,
+            actor_id="system",
+            actor_name="Worker",
+            description=f"Ingest do fornecedor '{supplier_name}' concluído: {rows_processed} linhas processadas",
+            details={
+                "supplier_id": supplier_id,
+                "supplier_name": supplier_name,
+                "run_id": run_id,
+                "rows_processed": rows_processed,
+                "products_created": products_created,
+                "products_updated": products_updated,
+                "errors": errors,
+            },
+        )

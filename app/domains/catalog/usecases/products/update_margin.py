@@ -17,6 +17,7 @@ from app.repositories.catalog.read.product_active_offer_read_repo import (
     ProductActiveOfferReadRepository,
 )
 from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
+from app.domains.audit.services.audit_service import AuditService
 
 log = logging.getLogger("gsm.catalog.update_margin")
 
@@ -45,12 +46,14 @@ def execute(
     pao_r = ProductActiveOfferReadRepository(db)
 
     try:
-        # 1) Garantir que o produto existe (via write repo)
+        # Garantir que o produto existe
         product = prod_w.get(id_product)
         if product is None:
             raise NotFound("Product not found")
 
-        # 2) Normalizar/validar margin
+        old_margin = product.margin
+
+        # Normalizar/validar margin
         try:
             new_margin = float(margin)
         except (TypeError, ValueError) as err:
@@ -59,7 +62,7 @@ def execute(
         if new_margin < 0:
             raise InvalidArgument("Margin must be >= 0")
 
-        # 3) Snapshot da oferta ativa ANTES do recálculo (via read repo)
+        # Snapshot da oferta ativa ANTES do recálculo
         prev_active_snapshot: dict[str, object] | None = None
         pao = pao_r.get_by_product(id_product)
         if pao is not None:
@@ -72,10 +75,10 @@ def execute(
                 "stock_sent": int(pao.stock_sent or 0),
             }
 
-        # 4) Aplicar a nova margem via write repo
+        # Aplicar a nova margem
         prod_w.set_margin(id_product=id_product, margin=new_margin)
 
-        # 5) Só faz sentido recalcular/emitir se estiver ligado ao PrestaShop
+        # Só faz sentido recalcular/emitir se estiver ligado ao PrestaShop
         if product.id_ecommerce and product.id_ecommerce > 0:
             new_active = recalculate_active_offer_for_product(
                 db,
@@ -89,6 +92,14 @@ def execute(
                 reason="margin_update",
                 prev_active_snapshot=prev_active_snapshot,
             )
+
+        # Registar no audit log (antes do commit)
+        AuditService(db).log_product_margin_update(
+            product_id=id_product,
+            product_name=product.name,
+            old_margin=float(old_margin) if old_margin is not None else None,
+            new_margin=new_margin,
+        )
 
         uow.commit()
 

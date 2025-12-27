@@ -11,6 +11,7 @@ from app.core.errors import BadRequest, Conflict, InvalidArgument
 from app.infra.uow import UoW
 from app.repositories.procurement.write.supplier_write_repo import SupplierWriteRepository
 from app.schemas.suppliers import SupplierCreate, SupplierOut
+from app.domains.audit.services.audit_service import AuditService
 
 
 def execute(uow: UoW, *, data: SupplierCreate) -> SupplierOut:
@@ -28,16 +29,22 @@ def execute(uow: UoW, *, data: SupplierCreate) -> SupplierOut:
 
     try:
         entity = repo.create(data)
+
+        # Registar no audit log (antes do commit para estar na mesma transação)
+        AuditService(db).log_supplier_create(
+            supplier_id=entity.id,
+            supplier_name=entity.name,
+        )
+
         uow.commit()
+
         return SupplierOut.model_validate(entity)
 
     except (InvalidArgument, Conflict):
-        # erros de domínio conhecidos → apenas rollback e rethrow
         uow.rollback()
         raise
 
     except IntegrityError as err:
-        # se escapar alguma IntegrityError não tratada no repo
         uow.rollback()
         raise Conflict("Could not create supplier due to integrity error") from err
 

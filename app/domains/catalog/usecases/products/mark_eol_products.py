@@ -13,6 +13,7 @@ from app.repositories.procurement.read.product_event_read_repo import ProductEve
 from app.repositories.catalog.write.catalog_update_stream_write_repo import (
     CatalogUpdateStreamWriteRepository,
 )
+from app.domains.audit.services.audit_service import AuditService
 
 EOL_THRESHOLD_DAYS = settings.EOL_THRESHOLD_DAYS
 
@@ -65,6 +66,13 @@ def execute(uow: UoW, *, as_of: datetime | None = None) -> dict[str, Any]:
                 priority=4,
             )
             events_enqueued = events_enqueued + 1
+
+    # Registar no audit log (antes do commit, se houve produtos marcados)
+    if products_marked > 0:
+        AuditService(db).log_product_eol_marked(
+            products_marked=products_marked,
+            events_enqueued=events_enqueued,
+        )
 
     uow.commit()
 

@@ -14,6 +14,7 @@ from app.infra.uow import UoW
 from app.repositories.procurement.read.supplier_feed_read_repo import (
     SupplierFeedReadRepository,
 )
+from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
 from app.repositories.procurement.write.mapper_write_repo import MapperWriteRepository
 from app.repositories.procurement.write.supplier_feed_write_repo import (
     SupplierFeedWriteRepository,
@@ -22,6 +23,7 @@ from app.repositories.procurement.write.supplier_write_repo import (
     SupplierWriteRepository,
 )
 from app.schemas.suppliers import SupplierBundleUpdate, SupplierDetailOut
+from app.domains.audit.services.audit_service import AuditService
 
 log = logging.getLogger("gsm.procurement.update_bundle")
 
@@ -165,6 +167,14 @@ def execute(uow: UoW, *, id_supplier: int, payload: SupplierBundleUpdate) -> Sup
 
         # 3) Mapper (depende do feed)
         _upsert_mapper_for_feed(map_w, feed_r, id_supplier, feed_entity, payload.mapper)
+
+        # Registar no audit log (antes do commit)
+        supplier = SupplierReadRepository(db).get(id_supplier)
+        if supplier:
+            AuditService(db).log_supplier_update(
+                supplier_id=id_supplier,
+                supplier_name=supplier.name,
+            )
 
         uow.commit()
 
