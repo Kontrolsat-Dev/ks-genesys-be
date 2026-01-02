@@ -78,6 +78,8 @@ def update_category_mapping(
         id_ps_category=payload.id_ps_category,
         ps_category_name=payload.ps_category_name,
         auto_import=payload.auto_import,
+        default_ecotax=payload.default_ecotax,
+        default_extra_fees=payload.default_extra_fees,
     )
 
 

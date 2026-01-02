@@ -21,12 +21,18 @@ def execute(
     id_ps_category: int,
     ps_category_name: str,
     auto_import: bool,
+    default_ecotax: float | None = None,
+    default_extra_fees: float | None = None,
 ) -> CategoryMappingOut:
     """
     Mapeia uma categoria Genesys para uma categoria PrestaShop.
 
     Quando auto_import é ativado, define auto_import_since com a data atual
     para que apenas produtos criados a partir desse momento sejam auto-importados.
+
+    Args:
+        default_ecotax: Ecotax default para produtos desta categoria
+        default_extra_fees: Extra fees default para produtos desta categoria
 
     Returns:
         CategoryMappingOut schema
@@ -42,6 +48,12 @@ def execute(
     cat.id_ps_category = id_ps_category
     cat.ps_category_name = ps_category_name
     cat.auto_import = auto_import
+
+    # Atualizar taxas default se fornecidas
+    if default_ecotax is not None:
+        cat.default_ecotax = default_ecotax
+    if default_extra_fees is not None:
+        cat.default_extra_fees = default_extra_fees
 
     # Se auto_import foi ativado agora, definir auto_import_since
     if auto_import and not was_auto_import:

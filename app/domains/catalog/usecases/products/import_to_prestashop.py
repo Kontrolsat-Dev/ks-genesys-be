@@ -11,6 +11,7 @@ from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
 from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 from app.repositories.catalog.read.brand_read_repo import BrandReadRepository
+from app.repositories.catalog.read.category_read_repo import CategoryReadRepository
 from app.repositories.catalog.write.product_active_offer_write_repo import (
     ProductActiveOfferWriteRepository,
 )
@@ -44,6 +45,7 @@ def execute(
     db = uow.db
     prod_r = ProductReadRepository(db)
     brand_r = BrandReadRepository(db)
+    cat_r = CategoryReadRepository(db)
     item_r = SupplierItemReadRepository(db)
     active_offer_w = ProductActiveOfferWriteRepository(db)
 
@@ -69,7 +71,25 @@ def execute(
         )
         best_offer = offers_sorted[0] if offers_sorted else None
 
-    # Calcular preço com margem
+    # Obter nome da marca se o produto tiver marca
+    brand_name: str | None = None
+    if product.id_brand:
+        brand = brand_r.get(product.id_brand)
+        if brand:
+            brand_name = brand.name
+
+    # Obter categoria para herança de taxas default
+    category = cat_r.get(product.id_category) if product.id_category else None
+
+    # Determinar ecotax e extra_fees (produto tem precedência, se não usa default da categoria)
+    ecotax = product.ecotax if product.ecotax > 0 else (category.default_ecotax if category else 0)
+    extra_fees = (
+        product.extra_fees
+        if product.extra_fees > 0
+        else (category.default_extra_fees if category else 0)
+    )
+
+    # Calcular preço: (custo × margem) + ecotax + taxas adicionais
     price_str: str | None = None
     stock: int | None = None
     cost: Decimal | None = None
@@ -81,19 +101,16 @@ def execute(
         if cost is not None:
             from app.domains.catalog.services.price_rounding import round_to_pretty_price
 
+            # Preço = (custo × (1 + margem)) + ecotax + extra_fees
             margin = Decimal(str(product.margin or 0))
-            raw_sale_price = float(cost * (1 + margin))
+            price_with_margin = cost * (1 + margin)
+            raw_sale_price = float(
+                price_with_margin + Decimal(str(ecotax)) + Decimal(str(extra_fees))
+            )
             sale_price = round_to_pretty_price(raw_sale_price)
             price_str = str(
                 Decimal(str(sale_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             )
-
-    # Obter nome da marca se o produto tiver marca
-    brand_name: str | None = None
-    if product.id_brand:
-        brand = brand_r.get(product.id_brand)
-        if brand:
-            brand_name = brand.name
 
     # Construir payload para PrestaShop
     payload = {
@@ -107,6 +124,7 @@ def execute(
         "image_url": product.image_url,
         "weight": product.weight_str,
         "brand_name": brand_name,
+        "ecotax": str(ecotax) if ecotax else None,
     }
 
     # Chamar API do PrestaShop
