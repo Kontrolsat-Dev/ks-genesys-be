@@ -258,7 +258,11 @@ def update_product_margin(
     aggregate_daily: bool = Query(True),
 ) -> ProductDetailOut:
     """
-    Atualiza a margem de um produto e devolve o detalhe atualizado.
+    Atualiza a margem e taxas de um produto e devolve o detalhe atualizado.
+
+    - margin: nova margem (decimal, ex: 0.20 = 20%)
+    - ecotax: ecotax em EUR (enviado separadamente ao PrestaShop)
+    - extra_fees: taxas adicionais em EUR (DAF, direitos, etc. - embute no preço)
 
     Mantemos as mesmas flags de expansão do GET /products/{id_product}
     para poderes reutilizar este endpoint no frontend sem teres de re-fetchar
@@ -268,6 +272,8 @@ def update_product_margin(
         uow,
         id_product=id_product,
         margin=payload.margin,
+        ecotax=payload.ecotax,
+        extra_fees=payload.extra_fees,
         expand_meta=expand_meta,
         expand_offers=expand_offers,
         expand_events=expand_events,

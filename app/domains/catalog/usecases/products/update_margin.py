@@ -27,6 +27,8 @@ def execute(
     *,
     id_product: int,
     margin: float,
+    ecotax: float | None = None,
+    extra_fees: float | None = None,
     expand_meta: bool = True,
     expand_offers: bool = True,
     expand_events: bool = True,
@@ -35,8 +37,13 @@ def execute(
     aggregate_daily: bool = True,
 ):
     """
-    Atualiza a margin de um produto e, se aplicável, recalcula a ProductActiveOffer
+    Atualiza a margin e taxas de um produto e, se aplicável, recalcula a ProductActiveOffer
     + emite evento de product_state_changed para o PrestaShop.
+
+    Args:
+        margin: Nova margem (decimal, ex: 0.20 = 20%)
+        ecotax: Ecotax em EUR (enviado separadamente ao PrestaShop)
+        extra_fees: Taxas adicionais em EUR (DAF, direitos, etc. - embute no preço)
 
     Retorna o ProductDetailOut atualizado com as mesmas flags de expansão
     usadas no detalhe normal.
@@ -77,6 +84,12 @@ def execute(
 
         # Aplicar a nova margem
         prod_w.set_margin(id_product=id_product, margin=new_margin)
+
+        # Atualizar taxas se fornecidas
+        if ecotax is not None:
+            product.ecotax = ecotax
+        if extra_fees is not None:
+            product.extra_fees = extra_fees
 
         # Só faz sentido recalcular/emitir se estiver ligado ao PrestaShop
         if product.id_ecommerce and product.id_ecommerce > 0:

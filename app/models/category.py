@@ -1,7 +1,7 @@
 # app/models/category.py
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text, Index, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, Text, Index, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infra.base import Base, utcnow
@@ -24,6 +24,10 @@ class Category(Base):
     ps_category_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     auto_import: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     auto_import_since: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Taxas default para produtos desta categoria
+    default_ecotax: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0)
+    default_extra_fees: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

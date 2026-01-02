@@ -34,6 +34,8 @@ class ProductOut(BaseModel):
     partnumber: str | None = None
     name: str | None = None
     margin: float | None = None
+    ecotax: float = 0
+    extra_fees: float = 0
     description: str | None = None
     image_url: str | None = None
     weight_str: str | None = None
@@ -115,13 +117,16 @@ class ProductDetailOut(BaseModel):
 
 class ProductMarginUpdate(BaseModel):
     """
-    Payload para atualização da margem de um produto.
+    Payload para atualização da margem e taxas de um produto.
 
-    A margem é um multiplicador usado para calcular o preço de venda
-    a partir do custo: unit_price_sent = unit_cost * (1 + margin).
+    - margin: multiplicador para calcular preço de venda
+    - ecotax: ecotax em EUR (enviado separadamente para PrestaShop)
+    - extra_fees: taxas adicionais em EUR (DAF, direitos, etc. - soma ao custo)
     """
 
     margin: float = Field(..., ge=0.0)
+    ecotax: float | None = Field(default=None, ge=0.0)
+    extra_fees: float | None = Field(default=None, ge=0.0)
 
 
 class ProductImportIn(BaseModel):

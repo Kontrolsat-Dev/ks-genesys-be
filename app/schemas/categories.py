@@ -16,6 +16,9 @@ class CategoryOut(BaseModel):
     id_ps_category: int | None = None
     ps_category_name: str | None = None
     auto_import: bool = False
+    # Default taxes for products in this category
+    default_ecotax: float = 0
+    default_extra_fees: float = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -33,6 +36,8 @@ class CategoryMappingIn(BaseModel):
     id_ps_category: int
     ps_category_name: str
     auto_import: bool = False
+    default_ecotax: float | None = None
+    default_extra_fees: float | None = None
 
 
 class CategoryMappingOut(BaseModel):
@@ -43,6 +48,8 @@ class CategoryMappingOut(BaseModel):
     id_ps_category: int | None
     ps_category_name: str | None
     auto_import: bool
+    default_ecotax: float = 0
+    default_extra_fees: float = 0
     updated_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)

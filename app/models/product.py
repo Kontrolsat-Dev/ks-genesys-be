@@ -27,6 +27,11 @@ class Product(Base):
     partnumber: Mapped[str | None] = mapped_column(Text, nullable=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     margin: Mapped[float] = mapped_column(Numeric(7, 4), nullable=False, default=0)
+
+    # Taxas adicionais
+    ecotax: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0)
+    extra_fees: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0)
+
     is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_eol: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
