@@ -32,6 +32,8 @@ def execute(
             id_ps_category=cat.id_ps_category,
             ps_category_name=cat.ps_category_name,
             auto_import=cat.auto_import,
+            default_ecotax=float(cat.default_ecotax) if cat.default_ecotax else 0,
+            default_extra_fees=float(cat.default_extra_fees) if cat.default_extra_fees else 0,
         )
         for cat in items
     ]

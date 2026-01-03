@@ -16,6 +16,7 @@ from app.repositories.catalog.write.product_active_offer_write_repo import (
     ProductActiveOfferWriteRepository,
 )
 from app.repositories.procurement.read.supplier_item_read_repo import SupplierItemReadRepository
+from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
 from app.core.errors import NotFound, InvalidArgument
 from app.domains.audit.services.audit_service import AuditService
 from app.schemas.products import ProductImportOut
@@ -47,6 +48,7 @@ def execute(
     brand_r = BrandReadRepository(db)
     cat_r = CategoryReadRepository(db)
     item_r = SupplierItemReadRepository(db)
+    supplier_r = SupplierReadRepository(db)
     active_offer_w = ProductActiveOfferWriteRepository(db)
 
     # Obter produto
@@ -81,13 +83,31 @@ def execute(
     # Obter categoria para herança de taxas default
     category = cat_r.get(product.id_category) if product.id_category else None
 
+    # Verificar país do fornecedor da melhor oferta
+    # Só aplicamos taxas (ecotax, extra_fees) se fornecedor NÃO é de Portugal
+    supplier_country: str | None = None
+    if best_offer and best_offer.get("id_supplier"):
+        supplier = supplier_r.get(best_offer["id_supplier"])
+        if supplier:
+            supplier_country = supplier.country
+
+    # Taxas só se aplicam se país != PT (ou país não definido trata como não-PT)
+    apply_taxes = supplier_country is None or supplier_country.upper() != "PT"
+
     # Determinar ecotax e extra_fees (produto tem precedência, se não usa default da categoria)
-    ecotax = product.ecotax if product.ecotax > 0 else (category.default_ecotax if category else 0)
-    extra_fees = (
-        product.extra_fees
-        if product.extra_fees > 0
-        else (category.default_extra_fees if category else 0)
-    )
+    if apply_taxes:
+        ecotax = (
+            product.ecotax if product.ecotax > 0 else (category.default_ecotax if category else 0)
+        )
+        extra_fees = (
+            product.extra_fees
+            if product.extra_fees > 0
+            else (category.default_extra_fees if category else 0)
+        )
+    else:
+        # Fornecedor português - não aplicar taxas adicionais
+        ecotax = 0
+        extra_fees = 0
 
     # Calcular preço: (custo × margem) + ecotax + taxas adicionais
     price_str: str | None = None
