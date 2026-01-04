@@ -24,6 +24,7 @@ class Supplier(Base):
     contact_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(250), nullable=True)
     margin: Mapped[float] = mapped_column(Numeric(7, 4), nullable=False, default=0)
+    discount: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False, default=0)
     country: Mapped[str | None] = mapped_column(String(2), nullable=True)
 
     # Scheduling de ingest

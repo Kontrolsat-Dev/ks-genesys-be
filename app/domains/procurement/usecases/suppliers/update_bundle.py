@@ -32,15 +32,20 @@ def _update_supplier_fields(
     sup_w: SupplierWriteRepository,
     id_supplier: int,
     supplier_data: Any | None,
-) -> None:
+    old_discount: float | None = None,
+) -> bool:
     """
     Aplica apenas os campos presentes usando o metodo update do repo,
     que já trata de normalização e unicidade do nome.
+
+    Returns:
+        True se o desconto mudou, False caso contrário.
     """
     if supplier_data is None:
-        return
+        return False
 
     kwargs: dict[str, Any] = {}
+    new_discount = None
 
     for f in (
         "name",
@@ -50,6 +55,7 @@ def _update_supplier_fields(
         "contact_phone",
         "contact_email",
         "margin",
+        "discount",
         "country",
         "ingest_interval_minutes",
         "ingest_enabled",
@@ -59,11 +65,18 @@ def _update_supplier_fields(
             v = getattr(supplier_data, f)
             if v is not None:
                 kwargs[f] = v
+                if f == "discount":
+                    new_discount = v
 
     if not kwargs:
-        return
+        return False
 
     sup_w.update(id_supplier, **kwargs)
+
+    # Verificar se o desconto mudou
+    if new_discount is not None and old_discount is not None:
+        return abs(float(new_discount) - float(old_discount)) > 0.0001
+    return new_discount is not None
 
 
 def _apply_feed_mutations(entity: Any, feed_payload: Any) -> None:
@@ -150,15 +163,31 @@ def execute(uow: UoW, *, id_supplier: int, payload: SupplierBundleUpdate) -> Sup
     db = uow.db
 
     sup_w = SupplierWriteRepository(db)
+    sup_r = SupplierReadRepository(db)
     feed_r = SupplierFeedReadRepository(db)
     feed_w = SupplierFeedWriteRepository(db)
     map_w = MapperWriteRepository(db)
 
     try:
-        # 1) Supplier (usa repo.update)
-        _update_supplier_fields(sup_w, id_supplier, payload.supplier)
+        # Obter desconto atual antes de atualizar
+        current_supplier = sup_r.get(id_supplier)
+        old_discount = float(current_supplier.discount or 0) if current_supplier else None
 
-        # 1b) Se ingest_enabled=True, garantir que existe job pending/running
+        # 1) Supplier (usa repo.update)
+        discount_changed = _update_supplier_fields(
+            sup_w, id_supplier, payload.supplier, old_discount
+        )
+
+        # 1b) Se desconto mudou, logar aviso
+        # NOTA: Recálculo síncrono desativado por timeout (pode haver milhares de produtos)
+        # Os produtos serão atualizados na próxima sincronização ou reimport manual
+        if discount_changed:
+            log.warning(
+                f"Desconto alterado para supplier {id_supplier}. "
+                f"Produtos afetados serão atualizados na próxima sync ou reimport."
+            )
+
+        # 1c) Se ingest_enabled=True, garantir que existe job pending/running
         if payload.supplier and getattr(payload.supplier, "ingest_enabled", None) is True:
             _ensure_supplier_ingest_job(db, id_supplier)
 
@@ -169,7 +198,7 @@ def execute(uow: UoW, *, id_supplier: int, payload: SupplierBundleUpdate) -> Sup
         _upsert_mapper_for_feed(map_w, feed_r, id_supplier, feed_entity, payload.mapper)
 
         # Registar no audit log (antes do commit)
-        supplier = SupplierReadRepository(db).get(id_supplier)
+        supplier = sup_r.get(id_supplier)
         if supplier:
             AuditService(db).log_supplier_update(
                 supplier_id=id_supplier,
@@ -185,6 +214,7 @@ def execute(uow: UoW, *, id_supplier: int, payload: SupplierBundleUpdate) -> Sup
         uow.rollback()
         raise Conflict("Could not update supplier bundle due to integrity constraints") from err
     except Exception as err:
+        log.exception("Unexpected error updating supplier bundle: %s", err)
         uow.rollback()
         raise BadRequest("Could not update supplier bundle") from err
 

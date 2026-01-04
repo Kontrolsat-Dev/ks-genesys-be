@@ -33,6 +33,7 @@ class SupplierItemReadRepository:
                 SF.id_supplier.label("id_supplier"),
                 S.name.label("supplier_name"),
                 S.logo_image.label("supplier_image"),
+                S.discount.label("supplier_discount"),
                 SI.sku.label("sku"),
                 SI.price.label("price"),
                 SI.stock.label("stock"),
@@ -59,6 +60,7 @@ class SupplierItemReadRepository:
                 SF.id_supplier.label("id_supplier"),
                 S.name.label("supplier_name"),
                 S.logo_image.label("supplier_image"),
+                S.discount.label("supplier_discount"),
                 SI.sku.label("sku"),
                 SI.price.label("price"),
                 SI.stock.label("stock"),
@@ -72,3 +74,16 @@ class SupplierItemReadRepository:
         if only_in_stock:
             q = q.where(SI.stock > 0)
         return [dict(r._mapping) for r in self.db.execute(q).all()]
+
+    def list_product_ids_for_supplier(self, id_supplier: int) -> list[int]:
+        """
+        Retorna os product_ids distintos que têm ofertas deste fornecedor.
+        Usado para recalcular active_offers quando o desconto muda.
+        """
+        q = (
+            select(SI.id_product)
+            .distinct()
+            .join(SF, SF.id == SI.id_feed)
+            .where(SF.id_supplier == id_supplier)
+        )
+        return [r[0] for r in self.db.execute(q).all()]

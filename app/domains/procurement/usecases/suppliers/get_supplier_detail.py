@@ -26,6 +26,7 @@ def _supplier_to_out(s) -> SupplierOut:
         contact_email=s.contact_email,
         margin=s.margin,
         country=s.country,
+        discount=s.discount,
         created_at=s.created_at,
         updated_at=s.updated_at,
         ingest_enabled=s.ingest_enabled,

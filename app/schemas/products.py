@@ -12,7 +12,7 @@ class OfferOut(BaseModel):
     supplier_image: str | None = None
     id_feed: int
     sku: str
-    price: str | None = None
+    price: str | None = None  # Preço já com desconto aplicado
     stock: int | None = None
     id_last_seen_run: int | None = None
     updated_at: datetime | None = None

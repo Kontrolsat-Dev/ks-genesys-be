@@ -83,21 +83,10 @@ def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> Pro
             if o.get("id_supplier"):
                 suppliers_set.add(int(o["id_supplier"]))
 
-    # 3.1) best_offer = melhor oferta COM STOCK (menor preço)
-    best: OfferOut | None = None
-    if offers:
-        candidates: list[OfferOut] = [
-            o for o in offers if o.stock is not None and o.stock > 0 and o.price is not None
-        ]
-        if candidates:
+    # 3.1) best_offer = melhor oferta COM STOCK (menor preço - já com desconto)
+    from app.domains.catalog.services.best_offer_service import find_best_offer_from_schemas
 
-            def price_key(of: OfferOut) -> float:
-                try:
-                    return float(of.price) if of.price is not None else float("inf")
-                except (TypeError, ValueError):
-                    return float("inf")
-
-            best = min(candidates, key=price_key)
+    best = find_best_offer_from_schemas(offers, require_stock=True)
 
     # 3.2) active_offer = oferta ativa/comunicada (ProductActiveOffer)
     active_offer: OfferOut | None = None

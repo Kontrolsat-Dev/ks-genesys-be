@@ -15,7 +15,9 @@ from app.repositories.catalog.read.category_read_repo import CategoryReadReposit
 from app.repositories.catalog.write.product_active_offer_write_repo import (
     ProductActiveOfferWriteRepository,
 )
-from app.repositories.procurement.read.supplier_item_read_repo import SupplierItemReadRepository
+from app.repositories.procurement.read.supplier_item_read_repo import (
+    SupplierItemReadRepository,
+)
 from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
 from app.core.errors import NotFound, InvalidArgument
 from app.domains.audit.services.audit_service import AuditService
@@ -35,10 +37,12 @@ def execute(
     Passos:
     1. Obter produto da base de dados
     2. Obter melhor oferta (menor preço)
-    3. Calcular preço de venda = custo * (1 + margem)
-    4. Construir payload para PrestaShop
-    5. Chamar API do PrestaShop
-    6. Atualizar produto com id_ecommerce
+    3. Verificar país do fornecedor - taxas só aplicam se país != PT
+    4. Aplicar desconto do fornecedor ao custo (se existir)
+    5. Calcular preço: (custo_descontado × (1 + margem)) + ecotax + extra_fees
+    6. Construir payload para PrestaShop
+    7. Chamar API do PrestaShop
+    8. Atualizar produto com id_ecommerce e active_offer
 
     Returns:
         ProductImportOut schema
@@ -61,17 +65,14 @@ def execute(
             f"Product {id_product} already imported (PS ID: {product.id_ecommerce})"
         )
 
-    # Obter ofertas e encontrar a melhor (menor preço)
+    # Obter ofertas e encontrar a melhor (menor custo efetivo)
+    from app.domains.catalog.services.best_offer_service import find_best_offer_from_dicts
+
     offers = item_r.list_offers_for_product(id_product, only_in_stock=False)
 
-    best_offer = None
-    if offers:
-        # Ordenar por preço ascendente e escolher o menor
-        offers_sorted = sorted(
-            offers,
-            key=lambda o: Decimal(o["price"]) if o.get("price") else Decimal("999999"),
-        )
-        best_offer = offers_sorted[0] if offers_sorted else None
+    # Encontrar melhor oferta (sem exigir stock para import)
+    # O desconto vem do campo supplier_discount no dict
+    best_offer = find_best_offer_from_dicts(offers, require_stock=False)
 
     # Obter nome da marca se o produto tiver marca
     brand_name: str | None = None
@@ -119,11 +120,19 @@ def execute(
         stock = best_offer.get("stock") or 0
 
         if cost is not None:
-            from app.domains.catalog.services.price_rounding import round_to_pretty_price
+            from app.domains.catalog.services.price_rounding import (
+                round_to_pretty_price,
+            )
 
-            # Preço = (custo × (1 + margem)) + ecotax + extra_fees
+            # Aplicar desconto do fornecedor ao custo (se existir)
+            # custo_descontado = custo × (1 - desconto)
+            # Usar supplier_discount do dict para consistência com outros fluxos
+            supplier_discount = Decimal(str(best_offer.get("supplier_discount") or 0))
+            discounted_cost = cost * (1 - supplier_discount)
+
+            # Preço = (custo_descontado × (1 + margem)) + ecotax + extra_fees
             margin = Decimal(str(product.margin or 0))
-            price_with_margin = cost * (1 + margin)
+            price_with_margin = discounted_cost * (1 + margin)
             raw_sale_price = float(
                 price_with_margin + Decimal(str(ecotax)) + Decimal(str(extra_fees))
             )

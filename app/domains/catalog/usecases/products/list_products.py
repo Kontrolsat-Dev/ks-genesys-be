@@ -69,26 +69,11 @@ def execute(
             offer: OfferOut = map_offer_row_to_out(o)
             items_map[o["id_product"]].offers.append(offer)
 
-    # 4) best_offer = melhor oferta COM STOCK (menor preço)
+    # 4) best_offer = melhor oferta COM STOCK (menor preço - já com desconto aplicado)
+    from app.domains.catalog.services.best_offer_service import find_best_offer_from_schemas
+
     for po in items_map.values():
-        best: OfferOut | None = None
-        offers = po.offers
-
-        if offers:
-            candidates: list[OfferOut] = [
-                o for o in offers if o.stock is not None and o.stock > 0 and o.price is not None
-            ]
-            if candidates:
-
-                def price_key(of: OfferOut) -> float:
-                    try:
-                        return float(of.price) if of.price is not None else float("inf")
-                    except (TypeError, ValueError):
-                        return float("inf")
-
-                best = min(candidates, key=price_key)
-
-        po.best_offer = best
+        po.best_offer = find_best_offer_from_schemas(po.offers, require_stock=True)
 
     # 5) active_offer = oferta ativa/comunicada (ProductActiveOffer)
     pao_repo = ProductActiveOfferReadRepository(db)

@@ -61,6 +61,7 @@ class SupplierWriteRepository:
             contact_email=(data.contact_email or None),
             contact_phone=(data.contact_phone or None),
             margin=(data.margin or 0.0),
+            discount=(data.discount or 0.0),
             country=(data.country or None),
         )
         self.db.add(e)
@@ -96,6 +97,7 @@ class SupplierWriteRepository:
         contact_email: str | None = None,
         contact_phone: str | None = None,
         margin: float | None = None,
+        discount: float | None = None,
         country: str | None = None,
         ingest_enabled: bool | None = None,
         ingest_interval_minutes: int | None = None,
@@ -127,6 +129,8 @@ class SupplierWriteRepository:
             s.contact_phone = contact_phone or None
         if margin is not None:
             s.margin = margin
+        if discount is not None:
+            s.discount = discount
         if country is not None:
             s.country = country or None
         if ingest_enabled is not None:

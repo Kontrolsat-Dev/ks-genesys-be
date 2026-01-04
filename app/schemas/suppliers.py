@@ -14,6 +14,7 @@ class SupplierCreate(BaseModel):
     contact_phone: str | None = None
     contact_email: str | None = None
     margin: float = 0
+    discount: float = 0
     country: str | None = None
     ingest_enabled: bool = True
     ingest_interval_minutes: int | None = None
@@ -28,6 +29,7 @@ class SupplierUpdate(BaseModel):
     contact_phone: str | None = None
     contact_email: str | None = None
     margin: float | None = None
+    discount: float | None = None
     country: str | None = None
     ingest_enabled: bool | None = None
     ingest_interval_minutes: int | None = None
@@ -43,6 +45,7 @@ class SupplierOut(BaseModel):
     contact_phone: str | None
     contact_email: str | None
     margin: float
+    discount: float = 0
     country: str | None
     created_at: datetime
     updated_at: datetime | None

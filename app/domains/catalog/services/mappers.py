@@ -45,14 +45,25 @@ def map_product_row_to_list_item(row: Any) -> ProductListItemOut:
 def map_offer_row_to_out(src: Mapping[str, Any]) -> OfferOut:
     """
     Converte o dict/row devolvido pelos SupplierItem READ repos num OfferOut.
+    O preço retornado já tem o desconto do fornecedor aplicado.
     """
+    # Aplicar desconto ao preço
+    raw_price = src.get("price")
+    discount = float(src.get("supplier_discount") or 0)
+    effective_price: str | None = None
+    if raw_price is not None:
+        try:
+            effective_price = str(round(float(raw_price) * (1 - discount), 2))
+        except (ValueError, TypeError):
+            effective_price = raw_price
+
     return OfferOut(
         id_supplier=src["id_supplier"],
         supplier_name=src.get("supplier_name"),
         supplier_image=src.get("supplier_image"),
         id_feed=src["id_feed"],
         sku=src["sku"],
-        price=src.get("price"),
+        price=effective_price,
         stock=src.get("stock"),
         id_last_seen_run=src.get("id_last_seen_run"),
         updated_at=src.get("updated_at"),

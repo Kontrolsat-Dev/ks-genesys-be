@@ -41,12 +41,14 @@ def choose_active_offer_candidate(
 
     Regras:
     - se existirem ofertas com stock > 0:
-        → escolhe a melhor ENTRE essas (menor preço, depois maior stock,
+        → escolhe a melhor ENTRE essas (menor custo efetivo, depois maior stock,
           depois menor id_supplier para desempatar)
     - se NÃO existirem ofertas com stock > 0 mas existirem ofertas:
         → escolhe a melhor oferta global (mesma ordenação), mesmo com stock = 0
     - se não houver ofertas:
         → devolve None
+
+    NOTA: custo efetivo = raw_price × (1 - supplier_discount)
     """
     if not id_product:
         return None
@@ -62,13 +64,16 @@ def choose_active_offer_candidate(
         raw_stock = _get(item, "stock")
         id_supplier = _get(item, "id_supplier")
         raw_id_supplier_item = _get(item, "id_supplier_item") or _get(item, "id")
+        supplier_discount = float(_get(item, "supplier_discount") or 0)
 
         if raw_price is None or raw_stock is None or id_supplier is None:
             continue
 
         try:
-            unit_cost = float(raw_price)
+            raw_price_float = float(raw_price)
             stock = int(raw_stock)
+            # Aplicar desconto do fornecedor para obter custo efetivo
+            unit_cost = raw_price_float * (1 - supplier_discount)
         except (TypeError, ValueError):
             continue
 
@@ -169,3 +174,26 @@ def recalculate_active_offer_for_product(
     )
 
     return entity
+
+
+def recalculate_active_offers_for_supplier(
+    db: Session,
+    *,
+    id_supplier: int,
+) -> int:
+    """
+    Recalcula a active_offer de todos os produtos que têm ofertas deste fornecedor.
+    Usado quando o desconto do fornecedor muda.
+
+    Returns:
+        Número de produtos atualizados.
+    """
+    si_repo = SupplierItemReadRepository(db)
+    product_ids = si_repo.list_product_ids_for_supplier(id_supplier)
+
+    updated = 0
+    for id_product in product_ids:
+        recalculate_active_offer_for_product(db, id_product=id_product)
+        updated += 1
+
+    return updated
