@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, Depends
 from app.infra.uow import UoW
 from app.core.deps import get_uow, require_access_token
 from app.schemas.brands import BrandListOut
-from app.domains.catalog.usecases.brands import list_brands as uc_list
+from app.domains.catalog.usecases.brands.list_brands import execute as uc_list
 
 
 router = APIRouter(prefix="/brands", tags=["brands"], dependencies=[Depends(require_access_token)])
@@ -24,4 +24,4 @@ def list_brands(
     """
     Lista as marcas.
     """
-    return uc_list.execute(uow, search=search, page=page, page_size=page_size)
+    return uc_list(uow, search=search, page=page, page_size=page_size)

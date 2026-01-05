@@ -40,7 +40,7 @@ class PrestashopCategoriesOut(BaseModel):
     categories: list[PrestashopCategoryNode]
 
 
-# -------- Categories --------
+# -------- Brands --------
 
 
 class PrestashopBrand(BaseModel):
@@ -64,3 +64,83 @@ class PrestashopBrandsOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
     language_id: int
     brands: list[PrestashopBrand]
+
+
+# -------- ORDERS --------
+
+
+class OrderCustomer(BaseModel):
+    """
+    Cliente
+    """
+
+    id_customer: int
+    email: str
+    firstname: str
+    lastname: str
+
+
+class OrderCarrier(BaseModel):
+    id_carrier: int
+    name: str
+
+
+# Shipping and billing address same schema
+class OrderAddress(BaseModel):
+    id_address: int
+    firstname: str
+    lastname: str
+    company: str | None = None
+    address1: str | None = None
+    address2: str | None = None
+    postcode: str | None = None
+    city: str | None = None
+    state: str | None = None
+    country: str | None = None
+    phone: str | None = None
+    phone_mobile: str | None = None
+    vat_number: str | None = None
+    dni: str | None = None
+
+
+class OrderDropshippingLine(BaseModel):
+    id_order_detail: int
+    id_product: int
+    id_product_attribute: int
+    product_name: str
+    product_reference: str
+    product_supplier_reference: str
+    product_ean13: str
+    product_upc_order_detail: str
+    product_upc_current: str
+    qty: int
+    unit_price_tax_excl: float
+    unit_price_tax_incl: float
+    total_price_tax_excl: float
+    total_price_tax_incl: float
+
+
+class Order(BaseModel):
+    id_order: int
+    reference: str
+    date_add: str
+    date_upd: str
+    current_state: int
+    payment: str
+    total_paid_tax_incl: float
+    total_paid_tax_excl: float
+    total_shipping_tax_incl: float
+    total_shipping_tax_excl: float
+    customer: OrderCustomer
+    carrier: OrderCarrier
+    delivery_address: OrderAddress
+    invoice_address: OrderAddress
+    dropshipping_lines: list[OrderDropshippingLine]
+
+
+class PrestashopOrdersDropshippingOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    success: bool
+    page: int
+    page_size: int
+    items: list[Order]

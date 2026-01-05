@@ -39,7 +39,8 @@ class PrestashopClient:
         self.validate_url: str | None = getattr(settings, "PS_AUTH_VALIDATE_URL", None)
         self.categories_url: str | None = getattr(settings, "PS_CATEGORIES_URL", None)
         self.brands_url: str | None = getattr(settings, "PS_BRANDS_URL", None)
-        self.products_url: str | None = getattr(settings, "PS_IMPORT_PRODUCT", None)
+        self.products_url: str | None = getattr(settings, "PS_IMPORT_PRODUCT_URL", None)
+        self.orders_url: str | None = getattr(settings, "PS_GET_ORDERS_URL", None)
         self.header_name: str | None = getattr(settings, "PS_AUTH_VALIDATE_HEADER", None)
         self.genesys_key: str | None = getattr(settings, "PS_GENESYS_KEY", None)
 
@@ -321,7 +322,7 @@ class PrestashopClient:
         Returns dict with id_product and success status.
         """
         if not self.products_url:
-            raise ValueError("PS_IMPORT_PRODUCT not configured")
+            raise ValueError("PS_IMPORT_PRODUCT_URL not configured")
 
         log.info(
             "ps.create_product name=%s",
@@ -345,3 +346,45 @@ class PrestashopClient:
             "success": True,
             **data,
         }
+
+    def get_orders_dropshipping(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        since: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Get prestashop dropshipping orders via r_genesys module.
+
+        Args:
+            page: Page number (1-indexed)
+            page_size: Items per page (max 200)
+            since: ISO date string for incremental sync (filters by date_upd)
+                   Format: "YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS"
+
+        Returns:
+            Dict with success, page, page_size, total, items
+        """
+        if not self.orders_url:
+            raise ValueError("PS_GET_ORDERS not configured")
+
+        # Construir URL com paginação e filtro de data
+        params = [f"page={page}", f"limit={page_size}"]
+        if since:
+            params.append(f"since={since}")
+
+        url = f"{self.orders_url}?{'&'.join(params)}"
+
+        log.info("ps.orders_dropshipping page=%d since=%s", page, since or "none")
+
+        data = self._request(
+            "GET",
+            url,
+            operation="ps.orders_dropshipping",
+        )
+
+        if not isinstance(data, dict):
+            log.warning("ps.orders invalid_payload_type type=%s", type(data).__name__)
+            raise RuntimeError("invalid_orders_payload")
+
+        return data

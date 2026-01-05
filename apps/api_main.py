@@ -21,6 +21,7 @@ from app.api.v1.categories import router as categories_router
 from app.api.v1.catalog_update_stream import router as catalog_updates_router
 from app.api.v1.worker_jobs import router as worker_jobs_router
 from app.api.v1.prestashop import router as prestashop_router
+from app.api.v1.orders_dropshipping import router as dropshipping_router
 from app.api.v1.config import router as config_router
 
 # Routes
@@ -73,3 +74,4 @@ app.include_router(brands_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
 app.include_router(catalog_updates_router, prefix="/api/v1")
 app.include_router(worker_jobs_router, prefix="/api/v1")
+app.include_router(dropshipping_router, prefix="/api/v1")

@@ -1,13 +1,16 @@
 # app/api/v1/prestashop.py
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import require_access_token, get_prestashop_client
 from app.domains.prestashop.usecases.categories.list_categories import (
     execute as uc_list_ps_categories,
 )
 from app.domains.prestashop.usecases.brands.list_brands import execute as uc_list_brands
+from app.domains.prestashop.usecases.orders.list_orders_dropshipping import (
+    execute as uc_list_orders_dropshipping,
+)
 from app.external.prestashop_client import PrestashopClient
 from app.schemas.prestashop import PrestashopCategoriesOut, PrestashopBrandsOut
 
@@ -48,3 +51,15 @@ def get_brands(
     Usado para matching de marcas durante importação de produtos.
     """
     return uc_list_brands(ps_client=client)
+
+
+@router.get(
+    path="/orders-dropshipping",
+    summary="Listar linhas de encomendas dropshipping",
+)
+def get_orders(
+    client: PrestashopClient = Depends(get_prestashop_client),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1),
+):
+    return uc_list_orders_dropshipping(page=page, page_size=page_size, ps_client=client)

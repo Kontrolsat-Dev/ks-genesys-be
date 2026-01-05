@@ -18,6 +18,12 @@ from .catalog_update_stream import CatalogUpdateStream
 from .worker_activity_config import WorkerActivityConfig
 from .worker_job import WorkerJob
 from .platform_config import PlatformConfig
+from .orders_dropshipping import (
+    DropshippingOrder,
+    DropshippingOrderLine,
+    SupplierOrder,
+    OrderStatus,
+)
 
 __all__ = [
     "Base",
@@ -40,6 +46,10 @@ __all__ = [
     "WorkerActivityConfig",
     "WorkerJob",
     "PlatformConfig",
+    "DropshippingOrder",
+    "DropshippingOrderLine",
+    "SupplierOrder",
+    "OrderStatus",
 ]
 
 
