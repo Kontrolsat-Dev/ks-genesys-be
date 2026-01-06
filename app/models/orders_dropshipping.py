@@ -61,8 +61,6 @@ class DropshippingOrder(Base):
     # Identificação PS
     id_ps_order: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
     reference: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    ps_state_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    ps_state_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Cliente
     customer_email: Mapped[str] = mapped_column(String(250), nullable=False)

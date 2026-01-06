@@ -18,6 +18,7 @@ from app.schemas.dropshipping import (
     DropshippingOrderListOut,
     SupplierOrderListOut,
     SelectSupplierIn,
+    PendingLinesListOut,
 )
 from app.domains.orders_dropshipping.usecases import (
     list_orders as uc_list_orders,
@@ -25,6 +26,7 @@ from app.domains.orders_dropshipping.usecases import (
     select_supplier as uc_select_supplier,
     list_supplier_orders as uc_list_supplier_orders,
     import_orders as uc_import_orders,
+    list_pending_lines as uc_list_pending_lines,
 )
 
 router = APIRouter(prefix="/orders-dropshipping", tags=["orders-dropshipping"])
@@ -62,6 +64,15 @@ def get_order(
 
 
 # --------------------- Linhas ---------------------
+
+
+@router.get("/pending-lines", response_model=PendingLinesListOut)
+def list_pending_lines(
+    uow: Annotated[UoW, Depends(get_uow)],
+    status: OrderStatus | None = Query(None, description="Filtrar por estado"),
+) -> PendingLinesListOut:
+    """Lista linhas com ofertas disponíveis de fornecedores."""
+    return uc_list_pending_lines.execute(uow=uow, status=status)
 
 
 @router.post("/orders/{order_id}/lines/{line_id}/select-supplier")

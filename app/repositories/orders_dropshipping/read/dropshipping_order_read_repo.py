@@ -110,6 +110,15 @@ class DropshippingOrderLineReadRepository:
         )
         return list(self.db.scalars(stmt))
 
+    def list_by_status(self, status: OrderStatus) -> list[DropshippingOrderLine]:
+        """Devolve todas as linhas com determinado estado."""
+        stmt = (
+            select(DropshippingOrderLine)
+            .where(DropshippingOrderLine.status == status)
+            .order_by(DropshippingOrderLine.id.desc())
+        )
+        return list(self.db.scalars(stmt))
+
 
 class SupplierOrderReadRepository:
     """Consultas de leitura para pedidos a fornecedores."""

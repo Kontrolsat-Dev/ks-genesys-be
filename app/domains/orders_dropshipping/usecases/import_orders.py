@@ -166,8 +166,9 @@ def _import_order(
         ps_date_upd=ps_date_upd,
     )
 
-    # Criar linhas
+    # Criar linhas - apenas products com match
     lines = item.get("dropshipping_lines", [])
+    imported_lines = 0
     for ln in lines:
         # Tentar fazer match do produto por EAN
         ean = ln.get("product_ean13") or ln.get("product_reference")
@@ -177,6 +178,16 @@ def _import_order(
             product = product_r.get_by_gtin(ean)
             if product:
                 id_product = product.id
+
+        # Só importar linhas com match no catálogo
+        if id_product is None:
+            log.debug(
+                "import_orders skip_line_no_match order=%d ean=%s ref=%s",
+                id_ps_order,
+                ln.get("product_ean13"),
+                ln.get("product_reference"),
+            )
+            continue
 
         line_w.create(
             id_order=order.id,
@@ -194,8 +205,13 @@ def _import_order(
             total_price_tax_incl=Decimal(str(ln.get("total_price_tax_incl", 0))),
             id_product=id_product,
         )
+        imported_lines += 1
 
     result.imported += 1
     log.debug(
-        "import_orders importada order=%d ref=%s lines=%d", id_ps_order, order.reference, len(lines)
+        "import_orders importada order=%d ref=%s lines=%d (de %d)",
+        id_ps_order,
+        order.reference,
+        imported_lines,
+        len(lines),
     )

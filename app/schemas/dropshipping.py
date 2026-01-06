@@ -71,6 +71,55 @@ class DropshippingOrderLineOut(BaseModel):
     id_supplier_order: int | None = None
 
 
+# --------------------- Ofertas de Fornecedor ---------------------
+
+
+class SupplierOfferOut(BaseModel):
+    """Oferta de um fornecedor para um produto."""
+
+    id_supplier: int
+    supplier_name: str | None = None
+    supplier_image: str | None = None
+    price: Decimal
+    stock: int
+
+
+class PendingLineWithOffersOut(BaseModel):
+    """Linha pendente com ofertas disponíveis de fornecedores."""
+
+    id: int
+    id_order: int
+    id_ps_order: int
+    order_reference: str
+    ps_state_name: str | None = None
+    customer_name: str
+
+    id_ps_order_detail: int
+    id_ps_product: int
+
+    product_name: str
+    product_reference: str | None
+    product_ean: str | None
+    product_supplier_reference: str | None
+
+    qty: int
+    unit_price_tax_excl: Decimal
+    unit_price_tax_incl: Decimal
+
+    id_product: int | None = None
+    status: OrderStatus
+
+    # Ofertas disponíveis
+    offers: list[SupplierOfferOut] = Field(default_factory=list)
+
+
+class PendingLinesListOut(BaseModel):
+    """Lista de linhas pendentes com ofertas."""
+
+    items: list[PendingLineWithOffersOut]
+    total: int
+
+
 # --------------------- Encomenda ---------------------
 
 
