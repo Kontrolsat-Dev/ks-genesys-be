@@ -19,7 +19,7 @@ def execute(
     id_supplier: int | None = None,
 ) -> ProductFacetsOut:
     """
-    Devolve listas de IDs (brand_ids, category_ids, supplier_ids) que têm 
+    Devolve listas de IDs (brand_ids, category_ids, supplier_ids) que têm
     pelo menos um produto compatível com os filtros fornecidos.
     """
     brand_ids, category_ids, supplier_ids = uow.products.get_facets(

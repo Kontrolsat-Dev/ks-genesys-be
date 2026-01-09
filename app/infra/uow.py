@@ -14,13 +14,21 @@ from app.repositories.catalog.read.product_read_repo import ProductReadRepositor
 from app.repositories.catalog.read.brand_read_repo import BrandReadRepository
 from app.repositories.catalog.read.category_read_repo import CategoryReadRepository
 from app.repositories.catalog.read.product_meta_read_repo import ProductMetaReadRepository
-from app.repositories.catalog.read.product_active_offer_read_repo import ProductActiveOfferReadRepository
-from app.repositories.catalog.read.catalog_update_stream_read_repo import CatalogUpdateStreamReadRepository
+from app.repositories.catalog.read.product_active_offer_read_repo import (
+    ProductActiveOfferReadRepository,
+)
+from app.repositories.catalog.read.catalog_update_stream_read_repo import (
+    CatalogUpdateStreamReadRepository,
+)
 from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
 from app.repositories.catalog.write.brand_write_repo import BrandWriteRepository
 from app.repositories.catalog.write.category_write_repo import CategoryWriteRepository
-from app.repositories.catalog.write.product_active_offer_write_repo import ProductActiveOfferWriteRepository
-from app.repositories.catalog.write.catalog_update_stream_write_repo import CatalogUpdateStreamWriteRepository
+from app.repositories.catalog.write.product_active_offer_write_repo import (
+    ProductActiveOfferWriteRepository,
+)
+from app.repositories.catalog.write.catalog_update_stream_write_repo import (
+    CatalogUpdateStreamWriteRepository,
+)
 from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
 from app.repositories.procurement.read.supplier_feed_read_repo import SupplierFeedReadRepository
 from app.repositories.procurement.read.feed_run_read_repo import FeedRunReadRepository
@@ -41,7 +49,8 @@ from app.repositories.audit.read.audit_log_read_repo import AuditLogReadReposito
 from app.repositories.audit.write.audit_log_write_repo import AuditLogWriteRepository
 from app.repositories.config.read.platform_config_read_repo import PlatformConfigReadRepository
 from app.repositories.config.write.platform_config_write_repo import PlatformConfigWriteRepository
-wa  # app/infra/uow.py
+
+# app/infra/uow.py
 # Unit of Work para SQLAlchemy - Centraliza acesso a repositórios e gestão de transações
 
 
@@ -120,13 +129,10 @@ class UoW:
         # ORDERS DROPSHIPPING - READ/WRITE
         # ═══════════════════════════════════════════════
         self.dropshipping_orders = DropshippingOrderReadRepository(db_session)
-        self.dropshipping_order_lines = DropshippingOrderLineReadRepository(
-            db_session)
+        self.dropshipping_order_lines = DropshippingOrderLineReadRepository(db_session)
         self.supplier_orders = SupplierOrderReadRepository(db_session)
-        self.dropshipping_orders_w = DropshippingOrderWriteRepository(
-            db_session)
-        self.dropshipping_order_lines_w = DropshippingOrderLineWriteRepository(
-            db_session)
+        self.dropshipping_orders_w = DropshippingOrderWriteRepository(db_session)
+        self.dropshipping_order_lines_w = DropshippingOrderLineWriteRepository(db_session)
         self.supplier_orders_w = SupplierOrderWriteRepository(db_session)
 
     @property
