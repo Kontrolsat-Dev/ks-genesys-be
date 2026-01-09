@@ -1,3 +1,6 @@
+# app/domains/catalog/usecases/products/update_margin.py
+# Atualiza margem e taxas de um produto
+
 from __future__ import annotations
 
 import logging
@@ -13,10 +16,6 @@ from app.domains.catalog.services.product_detail import (
 )
 from app.domains.catalog.services.sync_events import emit_product_state_event
 from app.infra.uow import UoW
-from app.repositories.catalog.read.product_active_offer_read_repo import (
-    ProductActiveOfferReadRepository,
-)
-from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
 from app.domains.audit.services.audit_service import AuditService
 
 log = logging.getLogger("gsm.catalog.update_margin")
@@ -48,13 +47,9 @@ def execute(
     Retorna o ProductDetailOut atualizado com as mesmas flags de expansão
     usadas no detalhe normal.
     """
-    db = uow.db
-    prod_w = ProductWriteRepository(db)
-    pao_r = ProductActiveOfferReadRepository(db)
-
     try:
         # Garantir que o produto existe
-        product = prod_w.get(id_product)
+        product = uow.products_w.get(id_product)
         if product is None:
             raise NotFound("Product not found")
 
@@ -71,7 +66,7 @@ def execute(
 
         # Snapshot da oferta ativa ANTES do recálculo
         prev_active_snapshot: dict[str, object] | None = None
-        pao = pao_r.get_by_product(id_product)
+        pao = uow.active_offers.get_by_product(id_product)
         if pao is not None:
             prev_active_snapshot = {
                 "id_supplier": pao.id_supplier,
@@ -83,7 +78,7 @@ def execute(
             }
 
         # Aplicar a nova margem
-        prod_w.set_margin(id_product=id_product, margin=new_margin)
+        uow.products_w.set_margin(id_product=id_product, margin=new_margin)
 
         # Atualizar taxas se fornecidas
         if ecotax is not None:
@@ -94,12 +89,12 @@ def execute(
         # Só faz sentido recalcular/emitir se estiver ligado ao PrestaShop
         if product.id_ecommerce and product.id_ecommerce > 0:
             new_active = recalculate_active_offer_for_product(
-                db,
+                uow.db,
                 id_product=id_product,
             )
 
             emit_product_state_event(
-                db,
+                uow.db,
                 product=product,
                 active_offer=new_active,
                 reason="margin_update",
@@ -107,7 +102,7 @@ def execute(
             )
 
         # Registar no audit log (antes do commit)
-        AuditService(db).log_product_margin_update(
+        AuditService(uow.db).log_product_margin_update(
             product_id=id_product,
             product_name=product.name,
             old_margin=float(old_margin) if old_margin is not None else None,
@@ -121,14 +116,16 @@ def execute(
         raise
     except IntegrityError as err:
         uow.rollback()
-        log.exception("Integrity error while updating margin for product id=%s", id_product)
+        log.exception(
+            "Integrity error while updating margin for product id=%s", id_product)
         raise BadRequest("Could not update product margin") from err
     except Exception as err:
         uow.rollback()
-        log.exception("Unexpected error while updating margin for product id=%s", id_product)
+        log.exception(
+            "Unexpected error while updating margin for product id=%s", id_product)
         raise BadRequest("Could not update product margin") from err
 
-    # 6) Devolver o detalhe já com a margin aplicada e, se for o caso, a active_offer recalculada
+    # Devolver o detalhe já com a margin aplicada e, se for o caso, a active_offer recalculada
     opts = DetailOptions(
         expand_meta=expand_meta,
         expand_offers=expand_offers,

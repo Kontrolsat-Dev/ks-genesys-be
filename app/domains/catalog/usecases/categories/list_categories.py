@@ -1,8 +1,9 @@
 # app/domains/catalog/usecases/categories/list_categories.py
+# Lista categorias com paginação e filtros
+
 from __future__ import annotations
 
 from app.infra.uow import UoW
-from app.repositories.catalog.read.category_read_repo import CategoryReadRepository
 from app.schemas.categories import CategoryOut, CategoryListOut
 
 
@@ -18,9 +19,8 @@ def execute(
     Lista categorias com paginação e filtros.
     Retorna CategoryListOut pronto para a API.
     """
-    db = uow.db
-    repo = CategoryReadRepository(db)
-    items, total = repo.list(q=search, page=page, page_size=page_size, auto_import=auto_import)
+    items, total = uow.categories.list(
+        q=search, page=page, page_size=page_size, auto_import=auto_import)
 
     # Serializar para schema com supplier_source_name
     serialized = [
@@ -32,8 +32,10 @@ def execute(
             id_ps_category=cat.id_ps_category,
             ps_category_name=cat.ps_category_name,
             auto_import=cat.auto_import,
-            default_ecotax=float(cat.default_ecotax) if cat.default_ecotax else 0,
-            default_extra_fees=float(cat.default_extra_fees) if cat.default_extra_fees else 0,
+            default_ecotax=float(
+                cat.default_ecotax) if cat.default_ecotax else 0,
+            default_extra_fees=float(
+                cat.default_extra_fees) if cat.default_extra_fees else 0,
         )
         for cat in items
     ]
