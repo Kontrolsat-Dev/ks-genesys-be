@@ -11,14 +11,6 @@ from decimal import Decimal
 
 from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
-from app.repositories.orders_dropshipping.read.dropshipping_order_read_repo import (
-    DropshippingOrderReadRepository,
-)
-from app.repositories.orders_dropshipping.write.dropshipping_order_write_repo import (
-    DropshippingOrderWriteRepository,
-    DropshippingOrderLineWriteRepository,
-)
-from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 
 log = logging.getLogger("gsm.dropshipping.import_orders")
 
@@ -55,12 +47,6 @@ def execute(
     Returns:
         ImportResult com estatísticas
     """
-    db = uow.db
-    order_r = DropshippingOrderReadRepository(db)
-    order_w = DropshippingOrderWriteRepository(db)
-    line_w = DropshippingOrderLineWriteRepository(db)
-    product_r = ProductReadRepository(db)
-
     result = ImportResult(error_messages=[])
 
     for page in range(1, max_pages + 1):
@@ -83,18 +69,16 @@ def execute(
             for item in items:
                 try:
                     _import_order(
+                        uow,
                         item,
-                        order_r=order_r,
-                        order_w=order_w,
-                        line_w=line_w,
-                        product_r=product_r,
                         result=result,
                     )
                 except Exception as e:
                     result.errors += 1
                     msg = f"Encomenda {item.get('id_order')}: {e}"
                     result.error_messages.append(msg)
-                    log.warning("import_orders erro order=%s: %s", item.get("id_order"), e)
+                    log.warning("import_orders erro order=%s: %s",
+                                item.get("id_order"), e)
 
             # Se retornou menos que page_size, não há mais páginas
             if len(items) < page_size:
@@ -121,12 +105,9 @@ def execute(
 
 
 def _import_order(
+    uow: UoW,
     item: dict,
     *,
-    order_r: DropshippingOrderReadRepository,
-    order_w: DropshippingOrderWriteRepository,
-    line_w: DropshippingOrderLineWriteRepository,
-    product_r: ProductReadRepository,
     result: ImportResult,
 ) -> None:
     """Importa uma encomenda individual."""
@@ -134,7 +115,7 @@ def _import_order(
     id_ps_order = item["id_order"]
 
     # Verificar se já existe
-    if order_r.exists_by_ps_order_id(id_ps_order):
+    if uow.dropshipping_orders.exists_by_ps_order_id(id_ps_order):
         result.skipped += 1
         return
 
@@ -146,7 +127,7 @@ def _import_order(
     ps_date_upd = datetime.fromisoformat(item["date_upd"].replace(" ", "T"))
 
     # Criar encomenda
-    order = order_w.create(
+    order = uow.dropshipping_orders_w.create(
         id_ps_order=id_ps_order,
         reference=item["reference"],
         ps_state_id=item["current_state"],
@@ -160,8 +141,10 @@ def _import_order(
         payment_method=item.get("payment"),
         total_paid_tax_incl=Decimal(str(item.get("total_paid_tax_incl", 0))),
         total_paid_tax_excl=Decimal(str(item.get("total_paid_tax_excl", 0))),
-        total_shipping_tax_incl=Decimal(str(item.get("total_shipping_tax_incl", 0))),
-        total_shipping_tax_excl=Decimal(str(item.get("total_shipping_tax_excl", 0))),
+        total_shipping_tax_incl=Decimal(
+            str(item.get("total_shipping_tax_incl", 0))),
+        total_shipping_tax_excl=Decimal(
+            str(item.get("total_shipping_tax_excl", 0))),
         ps_date_add=ps_date_add,
         ps_date_upd=ps_date_upd,
     )
@@ -175,7 +158,7 @@ def _import_order(
         id_product = None
 
         if ean:
-            product = product_r.get_by_gtin(ean)
+            product = uow.products.get_by_gtin(ean)
             if product:
                 id_product = product.id
 
@@ -189,7 +172,7 @@ def _import_order(
             )
             continue
 
-        line_w.create(
+        uow.dropshipping_order_lines_w.create(
             id_order=order.id,
             id_ps_order_detail=ln["id_order_detail"],
             id_ps_product=ln["id_product"],
@@ -201,8 +184,10 @@ def _import_order(
             qty=ln["qty"],
             unit_price_tax_excl=Decimal(str(ln.get("unit_price_tax_excl", 0))),
             unit_price_tax_incl=Decimal(str(ln.get("unit_price_tax_incl", 0))),
-            total_price_tax_excl=Decimal(str(ln.get("total_price_tax_excl", 0))),
-            total_price_tax_incl=Decimal(str(ln.get("total_price_tax_incl", 0))),
+            total_price_tax_excl=Decimal(
+                str(ln.get("total_price_tax_excl", 0))),
+            total_price_tax_incl=Decimal(
+                str(ln.get("total_price_tax_incl", 0))),
             id_product=id_product,
         )
         imported_lines += 1
