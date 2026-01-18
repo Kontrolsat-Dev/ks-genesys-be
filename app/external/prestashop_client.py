@@ -41,6 +41,7 @@ class PrestashopClient:
         self.brands_url: str | None = getattr(settings, "PS_BRANDS_URL", None)
         self.products_url: str | None = getattr(settings, "PS_IMPORT_PRODUCT_URL", None)
         self.orders_url: str | None = getattr(settings, "PS_GET_ORDERS_URL", None)
+        self.order_url: str | None = getattr(settings, "PS_GET_ORDER_URL", None)
         self.header_name: str | None = getattr(settings, "PS_AUTH_VALIDATE_HEADER", None)
         self.genesys_key: str | None = getattr(settings, "PS_GENESYS_KEY", None)
 
@@ -386,5 +387,30 @@ class PrestashopClient:
         if not isinstance(data, dict):
             log.warning("ps.orders invalid_payload_type type=%s", type(data).__name__)
             raise RuntimeError("invalid_orders_payload")
+
+        return data
+
+    def get_order_detail(self, id_order: int) -> dict[str, Any]:
+        """
+        Get details of a specific order via r_genesys/getorder (JIT).
+        """
+        if not self.orders_url:
+            raise ValueError("PS_GET_ORDERS not configured")
+
+        # Assume URL pattern replacement: getorders -> getorder
+        # This is because we don't have a separate config for getorder
+        url = f"{self.order_url}?id_order={id_order}"
+
+        log.info("ps.get_order_detail id_order=%d", id_order)
+
+        data = self._request(
+            "GET",
+            url,
+            operation="ps.get_order_detail",
+        )
+
+        if not isinstance(data, dict):
+            log.warning("ps.get_order_detail invalid_payload_type type=%s", type(data).__name__)
+            raise RuntimeError("invalid_order_detail_payload")
 
         return data

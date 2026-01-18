@@ -24,6 +24,7 @@ ignore = [
     "SIM108",
     "B023",
     "UP038",
+    "B904",
 ]
 
 [tool.ruff.lint.isort]

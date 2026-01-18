@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     PS_BRANDS_URL: str
     PS_IMPORT_PRODUCT_URL: str
     PS_GET_ORDERS_URL: str
+    PS_GET_ORDER_URL: str
 
     @property
     def database_url(self) -> str:

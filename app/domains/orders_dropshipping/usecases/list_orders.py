@@ -75,8 +75,6 @@ def execute(
                 id=o.id,
                 id_ps_order=o.id_ps_order,
                 reference=o.reference,
-                ps_state_id=o.ps_state_id,
-                ps_state_name=o.ps_state_name,
                 customer_email=o.customer_email,
                 customer_firstname=o.customer_firstname,
                 customer_lastname=o.customer_lastname,

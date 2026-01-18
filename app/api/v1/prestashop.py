@@ -1,7 +1,7 @@
 # app/api/v1/prestashop.py
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 
 from app.core.deps import require_access_token, get_prestashop_client
 from app.domains.prestashop.usecases.categories.list_categories import (
@@ -11,8 +11,15 @@ from app.domains.prestashop.usecases.brands.list_brands import execute as uc_lis
 from app.domains.prestashop.usecases.orders.list_orders_dropshipping import (
     execute as uc_list_orders_dropshipping,
 )
+from app.domains.prestashop.usecases.orders.get_order import (
+    execute as uc_get_ps_order,
+)
 from app.external.prestashop_client import PrestashopClient
-from app.schemas.prestashop import PrestashopCategoriesOut, PrestashopBrandsOut
+from app.schemas.prestashop import (
+    PrestashopCategoriesOut,
+    PrestashopBrandsOut,
+    PrestashopOrderDetailOut,
+)
 
 router = APIRouter(
     prefix="/prestashop",
@@ -63,3 +70,22 @@ def get_orders(
     page_size: int = Query(20, ge=1),
 ):
     return uc_list_orders_dropshipping(page=page, page_size=page_size, ps_client=client)
+
+
+@router.get(
+    "/orders/{id_order}",
+    response_model=PrestashopOrderDetailOut,
+    summary="Obter detalhes de uma encomenda (JIT)",
+)
+def get_order_detail(
+    id_order: int,
+    client: PrestashopClient = Depends(get_prestashop_client),
+):
+    """
+    Obtém detalhes completos de uma encomenda diretamente do PrestaShop via API (JIT).
+    Não usa base de dados local.
+    """
+    try:
+        return uc_get_ps_order(id_order=id_order, ps_client=client)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

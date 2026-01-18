@@ -73,8 +73,6 @@ def execute(
         id=order.id,
         id_ps_order=order.id_ps_order,
         reference=order.reference,
-        ps_state_id=order.ps_state_id,
-        ps_state_name=order.ps_state_name,
         customer_email=order.customer_email,
         customer_firstname=order.customer_firstname,
         customer_lastname=order.customer_lastname,

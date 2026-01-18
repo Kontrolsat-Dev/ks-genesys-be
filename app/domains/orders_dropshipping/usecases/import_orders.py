@@ -149,8 +149,6 @@ def _import_order(
     order = order_w.create(
         id_ps_order=id_ps_order,
         reference=item["reference"],
-        ps_state_id=item["current_state"],
-        ps_state_name=item.get("state_name"),
         customer_email=customer.get("email", ""),
         customer_firstname=customer.get("firstname", ""),
         customer_lastname=customer.get("lastname", ""),

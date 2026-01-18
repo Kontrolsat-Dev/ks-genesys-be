@@ -9,6 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from app.infra.bootstrap import ensure_recurring_jobs
 
 
+# Routes
 from app.api.v1.auth import router as auth_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.feeds import router as feeds_router
@@ -23,9 +24,9 @@ from app.api.v1.worker_jobs import router as worker_jobs_router
 from app.api.v1.prestashop import router as prestashop_router
 from app.api.v1.orders_dropshipping import router as dropshipping_router
 from app.api.v1.config import router as config_router
-
-# Routes
 from app.api.v1.system import router as system_router
+
+# Others
 from app.core.http_errors import init_error_handlers
 from app.core.logging import setup_logging
 from app.core.middleware import RequestContextMiddleware

@@ -1,7 +1,9 @@
 # app/schemas/prestashop.py
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # -------- Categories --------
@@ -144,3 +146,114 @@ class PrestashopOrdersDropshippingOut(BaseModel):
     page: int
     page_size: int
     items: list[Order]
+
+
+# -------- GET ORDER DETAIL (JIT) --------
+
+
+class OrderDetailCustomer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: int
+    name: str
+    email: str | None = None
+    group: int | None = None
+
+
+class OrderDetailCountry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: int
+    iso_code: str
+    name: str
+
+
+class OrderDetailAddressJIT(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: int
+    name: str
+    company: str | None = None
+    vat_number: str | None = None
+    address1: str | None = None
+    address2: str | None = None
+    postal_code: str | None = None
+    city: str | None = None
+    phone: str | None = None
+    mobile: str | None = None
+    country: OrderDetailCountry | None = None
+
+
+class OrderDetailStatus(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: int
+    name: str
+    color: str
+
+
+class OrderDetailService(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    cart_service_id: int
+    id_service_item: int
+    type: str
+    name: str
+    cost: float
+    sage_reference: str | None = None
+    quantity: int
+    total_cost: float
+
+
+class OrderDetailProduct(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    product_id: int | str
+    product_reference: str | None = None
+    product_name: str
+    product_quantity: int | str
+    product_price: float
+    product_ecotax: float | None = None
+    product_ean13: str | None = None
+    product_weight: float | None = None
+    product_category: str | None = None
+    product_manufacturer: str | None = None
+    product_upc: int | str | None = None
+    product_image: str | None = None
+    services: list[OrderDetailService] | None = None
+
+    @field_validator("product_upc", mode="before")
+    def parse_upc(cls, v: Any) -> int:
+        if not v:
+            return 0
+        try:
+            return int(v)
+        except ValueError:
+            return 0
+
+
+class OrderDetailShipping(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    carrier: str | None = None
+    price: float | None = None
+    weight: float | None = None
+
+
+class PrestashopOrderDetailOut(BaseModel):
+    """
+    Detalhes de uma encomenda obtidos via /getorder (JIT).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    id: int
+    reference: str
+    date_add: str | None = None
+    payment: str
+    discount: float | None = 0
+    total: float
+    total_products: float | None = 0
+    total_wrapping: float | None = 0
+    payment_tax: float | None = 0
+    customer: OrderDetailCustomer
+    delivery: OrderDetailAddressJIT
+    invoice: OrderDetailAddressJIT
+    shipping: OrderDetailShipping | None = None
+    status: OrderDetailStatus
+    products: list[OrderDetailProduct] = Field(default_factory=list)
+    notes: str | None = None
+    latest_message: str | None = None
+    hfrio: bool | None = False

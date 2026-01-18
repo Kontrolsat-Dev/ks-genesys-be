@@ -90,7 +90,6 @@ def execute(uow: UoW, status: OrderStatus | None = None) -> dict:
                 "id_order": line.id_order,
                 "id_ps_order": order.id_ps_order,
                 "order_reference": order.reference,
-                "ps_state_name": order.ps_state_name,
                 "customer_name": f"{order.customer_firstname} {order.customer_lastname}".strip(),
                 "id_ps_order_detail": line.id_ps_order_detail,
                 "id_ps_product": line.id_ps_product,

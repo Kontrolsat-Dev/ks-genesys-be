@@ -91,7 +91,6 @@ class PendingLineWithOffersOut(BaseModel):
     id_order: int
     id_ps_order: int
     order_reference: str
-    ps_state_name: str | None = None
     customer_name: str
 
     id_ps_order_detail: int
@@ -129,9 +128,6 @@ class DropshippingOrderOut(BaseModel):
     id: int
     id_ps_order: int
     reference: str
-    ps_state_id: int
-    ps_state_name: str | None
-
     customer_email: str
     customer_firstname: str
     customer_lastname: str

@@ -28,8 +28,6 @@ class DropshippingOrderWriteRepository:
         *,
         id_ps_order: int,
         reference: str,
-        ps_state_id: int,
-        ps_state_name: str | None,
         customer_email: str,
         customer_firstname: str,
         customer_lastname: str,
@@ -48,8 +46,6 @@ class DropshippingOrderWriteRepository:
         order = DropshippingOrder(
             id_ps_order=id_ps_order,
             reference=reference,
-            ps_state_id=ps_state_id,
-            ps_state_name=ps_state_name,
             customer_email=customer_email,
             customer_firstname=customer_firstname,
             customer_lastname=customer_lastname,
