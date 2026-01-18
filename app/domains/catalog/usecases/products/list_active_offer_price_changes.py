@@ -1,4 +1,5 @@
 # app/domains/catalog/usecases/products/list_active_offer_price_changes.py
+# Lista alterações de preços em ofertas ativas (produtos importados no PrestaShop)
 
 from __future__ import annotations
 
@@ -8,12 +9,6 @@ from typing import Literal
 
 from app.core.normalize import to_decimal
 from app.infra.uow import UoW
-from app.repositories.catalog.read.product_active_offer_read_repo import (
-    ProductActiveOfferReadRepository,
-)
-from app.repositories.procurement.read.product_event_read_repo import (
-    ProductEventReadRepository,
-)
 from app.schemas.products import ProductPriceChangeOut, ProductPriceChangeListOut
 
 Direction = Literal["up", "down", "both"]
@@ -29,13 +24,12 @@ def execute(
     page: int,
     page_size: int,
 ) -> ProductPriceChangeListOut:
-    db = uow.db  # type: ignore[attr-defined]
-
-    pao_repo = ProductActiveOfferReadRepository(db)
-    ev_repo = ProductEventReadRepository(db)
-
+    """
+    Lista produtos importados (com id_ecommerce) cujo preço ativo mudou recentemente.
+    Útil para análise de variações de preço em produtos que já estão na loja.
+    """
     # 1) active_offers + info de produto (nome, marca, categoria, margem)
-    rows = pao_repo.list_with_product_info()
+    rows = uow.active_offers.list_with_product_info()
     if not rows:
         return ProductPriceChangeListOut(
             items=[],
@@ -47,8 +41,10 @@ def execute(
     now = datetime.utcnow()
     since = now - timedelta(days=days)
 
-    min_abs_dec = Decimal(str(min_abs_delta)) if min_abs_delta is not None else None
-    min_pct_dec = Decimal(str(min_pct_delta)) if min_pct_delta is not None else None
+    min_abs_dec = Decimal(
+        str(min_abs_delta)) if min_abs_delta is not None else None
+    min_pct_dec = Decimal(
+        str(min_pct_delta)) if min_pct_delta is not None else None
 
     changes: list[ProductPriceChangeOut] = []
 
@@ -58,8 +54,8 @@ def execute(
         if not id_product or not id_supplier:
             continue
 
-        # 2) eventos só para este (produto, fornecedor)
-        events = ev_repo.list_events_for_product_supplier(
+        # 2) Eventos só para este (produto, fornecedor)
+        events = uow.product_events.list_events_for_product_supplier(
             id_product=id_product,
             id_supplier=id_supplier,
             since=since,
@@ -68,7 +64,7 @@ def execute(
         if not events:
             continue
 
-        # só queremos eventos com preço e razão init/change
+        # Só queremos eventos com preço e razão init/change
         filtered = [
             e
             for e in events
@@ -100,19 +96,20 @@ def execute(
             continue
 
         if old_price != 0:
-            delta_pct = (delta_abs / old_price * Decimal("100")).quantize(Decimal("0.01"))
+            delta_pct = (delta_abs / old_price * Decimal("100")
+                         ).quantize(Decimal("0.01"))
         else:
             delta_pct = Decimal("0.00")
 
         dir_str: Literal["up", "down"] = "up" if delta_abs > 0 else "down"
 
-        # filtro por direção
+        # Filtro por direção
         if direction == "up" and dir_str != "up":
             continue
         if direction == "down" and dir_str != "down":
             continue
 
-        # thresholds
+        # Thresholds
         if min_abs_dec is not None and abs(delta_abs) < min_abs_dec:
             continue
         if min_pct_dec is not None and abs(delta_pct) < min_pct_dec:
@@ -133,7 +130,7 @@ def execute(
             )
         )
 
-    # 3) ordenar por maior variação percentual (absoluto), depois € absoluto
+    # 3) Ordenar por maior variação percentual (absoluto), depois € absoluto
     changes.sort(
         key=lambda c: (abs(c.delta_pct), abs(c.delta_abs)),
         reverse=True,

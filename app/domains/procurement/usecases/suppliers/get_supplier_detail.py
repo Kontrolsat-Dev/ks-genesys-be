@@ -1,15 +1,12 @@
 # app/domains/procurement/usecases/suppliers/get_supplier_detail.py
+# Obtém detalhe completo de um fornecedor (supplier + feed + mapper)
+
 from __future__ import annotations
 
 import json
 
-from app.core.errors import NotFound  # << usar AppError
+from app.core.errors import NotFound
 from app.infra.uow import UoW
-from app.repositories.procurement.read.mapper_read_repo import MapperReadRepository
-from app.repositories.procurement.read.supplier_feed_read_repo import (
-    SupplierFeedReadRepository,
-)
-from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
 from app.schemas.feeds import SupplierFeedOut
 from app.schemas.mappers import FeedMapperOut
 from app.schemas.suppliers import SupplierDetailOut, SupplierOut
@@ -63,7 +60,8 @@ def _mapper_to_out(m) -> FeedMapperOut | None:
     if not m:
         return None
     try:
-        profile = json.loads(m.profile_json) if getattr(m, "profile_json", None) else {}
+        profile = json.loads(m.profile_json) if getattr(
+            m, "profile_json", None) else {}
     except Exception:
         profile = {}
     return FeedMapperOut(
@@ -77,17 +75,13 @@ def _mapper_to_out(m) -> FeedMapperOut | None:
 
 
 def execute(uow: UoW, *, id_supplier: int) -> SupplierDetailOut:
-    db = uow.db
-    sup_repo = SupplierReadRepository(db)
-    feed_repo = SupplierFeedReadRepository(db)
-    map_repo = MapperReadRepository(db)
-
-    s = sup_repo.get(id_supplier)
+    """Obtém detalhe completo de um fornecedor incluindo feed e mapper."""
+    s = uow.suppliers.get(id_supplier)
     if not s:
-        raise NotFound("Supplier not found")  # << em vez de HTTPException
+        raise NotFound("Fornecedor não encontrado")
 
-    f = feed_repo.get_by_supplier(id_supplier)
-    m = map_repo.get_by_feed(f.id) if f else None
+    f = uow.feeds.get_by_supplier(id_supplier)
+    m = uow.mappers.get_by_feed(f.id) if f else None
 
     return SupplierDetailOut(
         supplier=_supplier_to_out(s),

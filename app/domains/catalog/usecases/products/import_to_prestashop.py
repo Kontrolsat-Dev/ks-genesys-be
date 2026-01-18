@@ -9,16 +9,6 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
-from app.repositories.catalog.read.product_read_repo import ProductReadRepository
-from app.repositories.catalog.read.brand_read_repo import BrandReadRepository
-from app.repositories.catalog.read.category_read_repo import CategoryReadRepository
-from app.repositories.catalog.write.product_active_offer_write_repo import (
-    ProductActiveOfferWriteRepository,
-)
-from app.repositories.procurement.read.supplier_item_read_repo import (
-    SupplierItemReadRepository,
-)
-from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
 from app.core.errors import NotFound, InvalidArgument
 from app.domains.audit.services.audit_service import AuditService
 from app.schemas.products import ProductImportOut
@@ -47,28 +37,21 @@ def execute(
     Returns:
         ProductImportOut schema
     """
-    db = uow.db
-    prod_r = ProductReadRepository(db)
-    brand_r = BrandReadRepository(db)
-    cat_r = CategoryReadRepository(db)
-    item_r = SupplierItemReadRepository(db)
-    supplier_r = SupplierReadRepository(db)
-    active_offer_w = ProductActiveOfferWriteRepository(db)
-
     # Obter produto
-    product = prod_r.get(id_product)
+    product = uow.products.get(id_product)
     if not product:
-        raise NotFound(f"Product {id_product} not found")
+        raise NotFound(f"Produto {id_product} não encontrado")
 
     if product.id_ecommerce:
         raise InvalidArgument(
-            f"Product {id_product} already imported (PS ID: {product.id_ecommerce})"
+            f"Produto {id_product} já importado (PS ID: {product.id_ecommerce})"
         )
 
     # Obter ofertas e encontrar a melhor (menor custo efetivo)
     from app.domains.catalog.services.best_offer_service import find_best_offer_from_dicts
 
-    offers = item_r.list_offers_for_product(id_product, only_in_stock=False)
+    offers = uow.supplier_items.list_offers_for_product(
+        id_product, only_in_stock=False)
 
     # Encontrar melhor oferta (sem exigir stock para import)
     # O desconto vem do campo supplier_discount no dict
@@ -77,18 +60,19 @@ def execute(
     # Obter nome da marca se o produto tiver marca
     brand_name: str | None = None
     if product.id_brand:
-        brand = brand_r.get(product.id_brand)
+        brand = uow.brands.get(product.id_brand)
         if brand:
             brand_name = brand.name
 
     # Obter categoria para herança de taxas default
-    category = cat_r.get(product.id_category) if product.id_category else None
+    category = uow.categories.get(
+        product.id_category) if product.id_category else None
 
     # Verificar país do fornecedor da melhor oferta
     # Só aplicamos taxas (ecotax, extra_fees) se fornecedor NÃO é de Portugal
     supplier_country: str | None = None
     if best_offer and best_offer.get("id_supplier"):
-        supplier = supplier_r.get(best_offer["id_supplier"])
+        supplier = uow.suppliers.get(best_offer["id_supplier"])
         if supplier:
             supplier_country = supplier.country
 
@@ -98,7 +82,8 @@ def execute(
     # Determinar ecotax e extra_fees (produto tem precedência, se não usa default da categoria)
     if apply_taxes:
         ecotax = (
-            product.ecotax if product.ecotax > 0 else (category.default_ecotax if category else 0)
+            product.ecotax if product.ecotax > 0 else (
+                category.default_ecotax if category else 0)
         )
         extra_fees = (
             product.extra_fees
@@ -116,7 +101,8 @@ def execute(
     cost: Decimal | None = None
 
     if best_offer:
-        cost = Decimal(best_offer["price"]) if best_offer.get("price") else None
+        cost = Decimal(best_offer["price"]) if best_offer.get(
+            "price") else None
         stock = best_offer.get("stock") or 0
 
         if cost is not None:
@@ -126,19 +112,21 @@ def execute(
 
             # Aplicar desconto do fornecedor ao custo (se existir)
             # custo_descontado = custo × (1 - desconto)
-            # Usar supplier_discount do dict para consistência com outros fluxos
-            supplier_discount = Decimal(str(best_offer.get("supplier_discount") or 0))
+            supplier_discount = Decimal(
+                str(best_offer.get("supplier_discount") or 0))
             discounted_cost = cost * (1 - supplier_discount)
 
             # Preço = (custo_descontado × (1 + margem)) + ecotax + extra_fees
             margin = Decimal(str(product.margin or 0))
             price_with_margin = discounted_cost * (1 + margin)
             raw_sale_price = float(
-                price_with_margin + Decimal(str(ecotax)) + Decimal(str(extra_fees))
+                price_with_margin +
+                Decimal(str(ecotax)) + Decimal(str(extra_fees))
             )
             sale_price = round_to_pretty_price(raw_sale_price)
             price_str = str(
-                Decimal(str(sale_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                Decimal(str(sale_price)).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP)
             )
 
     # Construir payload para PrestaShop
@@ -163,15 +151,16 @@ def execute(
     ps_product_id = result.get("id_product")
     if ps_product_id:
         product.id_ecommerce = int(ps_product_id)
-        db.add(product)
-        db.flush()
+        uow.db.add(product)
+        uow.db.flush()
 
         # Atualizar active offer com dados da oferta importada
         if best_offer:
-            active_offer_w.upsert(
+            uow.active_offers_w.upsert(
                 id_product=id_product,
                 id_supplier=best_offer.get("id_supplier"),
-                id_supplier_item=best_offer.get("id") or best_offer.get("id_supplier_item"),
+                id_supplier_item=best_offer.get(
+                    "id") or best_offer.get("id_supplier_item"),
                 unit_cost=float(cost) if cost is not None else None,
                 unit_price_sent=float(price_str) if price_str else None,
                 stock_sent=stock,
@@ -181,7 +170,7 @@ def execute(
         uow.commit()
 
         # Registar no audit log
-        AuditService(db).log_product_import(
+        AuditService(uow.db).log_product_import(
             product_id=id_product,
             product_name=product.name,
             id_ecommerce=ps_product_id,

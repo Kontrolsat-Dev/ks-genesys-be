@@ -6,9 +6,6 @@ from __future__ import annotations
 
 from app.infra.uow import UoW
 from app.models.orders_dropshipping import OrderStatus
-from app.repositories.orders_dropshipping.read.dropshipping_order_read_repo import (
-    DropshippingOrderReadRepository,
-)
 from app.schemas.dropshipping import (
     AddressOut,
     DropshippingOrderOut,
@@ -36,8 +33,7 @@ def execute(
     Returns:
         DropshippingOrderListOut: Lista paginada
     """
-    repo = DropshippingOrderReadRepository(uow.db)
-    orders, total = repo.list_orders(
+    orders, total = uow.dropshipping_orders.list_orders(
         page=page,
         page_size=page_size,
         status=status,
@@ -79,8 +75,10 @@ def execute(
                 customer_firstname=o.customer_firstname,
                 customer_lastname=o.customer_lastname,
                 customer_name=f"{o.customer_firstname} {o.customer_lastname}",
-                delivery_address=AddressOut(**o.delivery_address) if o.delivery_address else None,
-                invoice_address=AddressOut(**o.invoice_address) if o.invoice_address else None,
+                delivery_address=AddressOut(
+                    **o.delivery_address) if o.delivery_address else None,
+                invoice_address=AddressOut(
+                    **o.invoice_address) if o.invoice_address else None,
                 carrier_name=o.carrier_name,
                 payment_method=o.payment_method,
                 total_paid_tax_incl=o.total_paid_tax_incl,
@@ -92,7 +90,8 @@ def execute(
                 created_at=o.created_at,
                 lines=lines_out,
                 lines_count=len(lines_out),
-                lines_pending=sum(1 for ln in lines_out if ln.status == OrderStatus.PENDING),
+                lines_pending=sum(
+                    1 for ln in lines_out if ln.status == OrderStatus.PENDING),
                 lines_matched=sum(1 for ln in lines_out if ln.product_matched),
             )
         )

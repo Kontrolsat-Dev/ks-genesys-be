@@ -1,3 +1,6 @@
+# app/domains/catalog/usecases/products/list_products.py
+# Lista produtos do catálogo com paginação, filtros e expansão de ofertas
+
 from __future__ import annotations
 
 from app.domains.catalog.services.mappers import (
@@ -6,13 +9,6 @@ from app.domains.catalog.services.mappers import (
     map_active_offer_from_pao_to_out,
 )
 from app.infra.uow import UoW
-from app.repositories.catalog.read.product_active_offer_read_repo import (
-    ProductActiveOfferReadRepository,
-)
-from app.repositories.catalog.read.product_read_repo import ProductReadRepository
-from app.repositories.procurement.read.supplier_item_read_repo import (
-    SupplierItemReadRepository,
-)
 from app.schemas.products import OfferOut, ProductListOut, ProductListItemOut
 
 
@@ -34,11 +30,12 @@ def execute(
     sort: str = "recent",  # "recent" | "name" | "cheapest" (repo trata disto)
     expand_offers: bool = True,
 ) -> ProductListOut:
-    db = uow.db
-
-    # 1) obter produtos paginados
-    repo = ProductReadRepository(db)
-    rows, total = repo.list_products(
+    """
+    Lista produtos do catálogo com paginação e filtros avançados.
+    Suporta pesquisa por texto, GTIN, marca, categoria, stock e fornecedor.
+    """
+    # 1) Obter produtos paginados
+    rows, total = uow.products.list_products(
         page=page,
         page_size=page_size,
         q=q,
@@ -61,23 +58,23 @@ def execute(
         ids.append(r.id)
         items_map[r.id] = map_product_row_to_list_item(r)
 
-    # 3) Opcionalmente expandir ofertas via Procurement READ repo
+    # 2) Opcionalmente expandir ofertas via repositório de supplier items
     if expand_offers:
-        si_repo = SupplierItemReadRepository(db)
-        offers_raw = si_repo.list_offers_for_product_ids(ids, only_in_stock=False)
+        offers_raw = uow.supplier_items.list_offers_for_product_ids(
+            ids, only_in_stock=False)
         for o in offers_raw:
             offer: OfferOut = map_offer_row_to_out(o)
             items_map[o["id_product"]].offers.append(offer)
 
-    # 4) best_offer = melhor oferta COM STOCK (menor preço - já com desconto aplicado)
+    # 3) best_offer = melhor oferta COM STOCK (menor preço - já com desconto aplicado)
     from app.domains.catalog.services.best_offer_service import find_best_offer_from_schemas
 
     for po in items_map.values():
-        po.best_offer = find_best_offer_from_schemas(po.offers, require_stock=True)
+        po.best_offer = find_best_offer_from_schemas(
+            po.offers, require_stock=True)
 
-    # 5) active_offer = oferta ativa/comunicada (ProductActiveOffer)
-    pao_repo = ProductActiveOfferReadRepository(db)
-    active_map = pao_repo.list_for_products(ids)
+    # 4) active_offer = oferta ativa/comunicada (ProductActiveOffer)
+    active_map = uow.active_offers.list_for_products(ids)
 
     for po in items_map.values():
         active: OfferOut | None = None

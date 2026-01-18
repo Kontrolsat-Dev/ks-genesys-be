@@ -1,4 +1,6 @@
 # app/domains/catalog/usecases/products/mark_eol_products.py
+# Marca produtos como EOL (End of Life) quando sem stock há muito tempo
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -7,12 +9,6 @@ from typing import Any
 from app.infra.base import utcnow
 from app.infra.uow import UoW
 from app.core.config import settings
-from app.repositories.catalog.read.product_read_repo import ProductReadRepository
-from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
-from app.repositories.procurement.read.product_event_read_repo import ProductEventReadRepository
-from app.repositories.catalog.write.catalog_update_stream_write_repo import (
-    CatalogUpdateStreamWriteRepository,
-)
 from app.domains.audit.services.audit_service import AuditService
 
 EOL_THRESHOLD_DAYS = settings.EOL_THRESHOLD_DAYS
@@ -31,35 +27,29 @@ def execute(uow: UoW, *, as_of: datetime | None = None) -> dict[str, Any]:
     Se o produto tiver id_ecommerce definido (>0), enfileira um
     product_state_changed no CatalogUpdateStream para o Prestashop o desativar.
     """
-    db = uow.db
     now = as_of or utcnow()
     cutoff = now - timedelta(days=EOL_THRESHOLD_DAYS)
 
-    events_r = ProductEventReadRepository(db)
-    prod_r = ProductReadRepository(db)
-    prod_w = ProductWriteRepository(db)
-    stream_w = CatalogUpdateStreamWriteRepository(db)
-
-    candidate_ids = events_r.list_products_to_mark_eol(cutoff=cutoff)
+    candidate_ids = uow.product_events.list_products_to_mark_eol(cutoff=cutoff)
 
     products_marked = 0
     events_enqueued = 0
 
     for id_product in candidate_ids:
-        product = prod_r.get(id_product)
+        product = uow.products.get(id_product)
         if not product:
             continue
 
         if getattr(product, "is_eol", False):
             continue
 
-        prod_w.set_eol(id_product, True)
+        uow.products_w.set_eol(id_product, True)
         products_marked = products_marked + 1
         id_ecommerce = getattr(product, "id_ecommerce", None)
 
         # Caso produto esteja ligado ao Prestashop (id_ecommerce > 0) mandamos update
         if id_ecommerce and id_ecommerce > 0:
-            stream_w.enqueue_product_state_change(
+            uow.catalog_events_w.enqueue_product_state_change(
                 product=product,
                 active_offer=getattr(product, "active_offer", None),
                 reason="eol_marked",
@@ -69,7 +59,7 @@ def execute(uow: UoW, *, as_of: datetime | None = None) -> dict[str, Any]:
 
     # Registar no audit log (antes do commit, se houve produtos marcados)
     if products_marked > 0:
-        AuditService(db).log_product_eol_marked(
+        AuditService(uow.db).log_product_eol_marked(
             products_marked=products_marked,
             events_enqueued=events_enqueued,
         )

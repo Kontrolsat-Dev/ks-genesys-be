@@ -6,7 +6,6 @@ UseCase para listar fornecedores com paginação e pesquisa.
 from __future__ import annotations
 
 from app.infra.uow import UoW
-from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
 from app.schemas.suppliers import SupplierList, SupplierOut
 
 
@@ -17,9 +16,7 @@ def execute(uow: UoW, *, search: str | None, page: int, page_size: int) -> Suppl
     Returns:
         SupplierList schema
     """
-    db = uow.db
-    repo = SupplierReadRepository(db)
-    items, total = repo.search_paginated(search, page, page_size)
+    items, total = uow.suppliers.search_paginated(search, page, page_size)
 
     return SupplierList(
         items=[SupplierOut.model_validate(s) for s in items],

@@ -1,7 +1,7 @@
 # app/domains/catalog/usecases/products/get_product_facets.py
+# Devolve facets (marcas/categorias/fornecedores) válidos para os filtros atuais
 
 from app.infra.uow import UoW
-from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 from app.schemas.products import ProductFacetsOut
 
 
@@ -18,10 +18,11 @@ def execute(
     has_stock: bool | None = None,
     id_supplier: int | None = None,
 ) -> ProductFacetsOut:
-    db = uow.db
-    repo = ProductReadRepository(db)
-
-    brand_ids, category_ids, supplier_ids = repo.get_facets(
+    """
+    Devolve listas de IDs (brand_ids, category_ids, supplier_ids) que têm
+    pelo menos um produto compatível com os filtros fornecidos.
+    """
+    brand_ids, category_ids, supplier_ids = uow.products.get_facets(
         q=q,
         gtin=gtin,
         partnumber=partnumber,

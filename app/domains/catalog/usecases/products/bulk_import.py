@@ -10,8 +10,6 @@ import logging
 
 from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
-from app.repositories.catalog.read.product_read_repo import ProductReadRepository
-from app.repositories.catalog.read.category_read_repo import CategoryReadRepository
 from app.schemas.products import BulkImportOut, BulkImportItemResult
 from app.domains.catalog.usecases.products import import_to_prestashop
 from app.domains.audit.services.audit_service import AuditService
@@ -40,10 +38,6 @@ def execute(
     Returns:
         BulkImportOut com resultados agregados
     """
-    db = uow.db
-    prod_repo = ProductReadRepository(db)
-    cat_repo = CategoryReadRepository(db)
-
     results: list[BulkImportItemResult] = []
     imported = 0
     failed = 0
@@ -51,7 +45,7 @@ def execute(
 
     for pid in product_ids:
         # 1) Buscar produto
-        product = prod_repo.get(pid)
+        product = uow.products.get(pid)
         if not product:
             failed += 1
             results.append(
@@ -82,13 +76,13 @@ def execute(
             if cat_margin is not None:
                 # Converter de percentagem para decimal (25.0 -> 0.25)
                 product.margin = cat_margin / 100.0
-                db.add(product)
-                db.flush()
+                uow.db.add(product)
+                uow.db.flush()
 
         # 3) Determinar categoria PS
         id_ps_category = id_ps_category_override
         if not id_ps_category and product.id_category:
-            category = cat_repo.get(product.id_category)
+            category = uow.categories.get(product.id_category)
             if category and category.id_ps_category:
                 id_ps_category = category.id_ps_category
 
@@ -119,7 +113,8 @@ def execute(
                     id_ecommerce=result.get("id_ecommerce"),
                 )
             )
-            log.info("Produto %d importado para PS (ID: %s)", pid, result.get("id_ecommerce"))
+            log.info("Produto %d importado para PS (ID: %s)",
+                     pid, result.get("id_ecommerce"))
 
         except Exception as e:
             failed += 1
@@ -132,10 +127,10 @@ def execute(
             )
             log.warning("Falha ao importar produto %d: %s", pid, e)
 
-    db.commit()
+    uow.commit()
 
     # Audit log
-    AuditService(db).log_bulk_import(
+    AuditService(uow.db).log_bulk_import(
         total=len(product_ids),
         imported=imported,
         failed=failed,
