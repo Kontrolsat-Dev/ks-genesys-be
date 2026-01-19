@@ -4,6 +4,7 @@ UseCase: Obter detalhes de uma encomenda Dropshipping.
 
 from __future__ import annotations
 
+from app.core.errors import NotFound
 from app.infra.uow import UoW
 from app.models.orders_dropshipping import OrderStatus
 from app.repositories.orders_dropshipping.read.dropshipping_order_read_repo import (
@@ -16,8 +17,10 @@ from app.schemas.dropshipping import (
 )
 
 
-class OrderNotFoundError(Exception):
+class OrderNotFoundError(NotFound):
     """Encomenda não encontrada."""
+
+    code = "ORDER_NOT_FOUND"
 
 
 def execute(

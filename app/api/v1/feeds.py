@@ -29,7 +29,7 @@ from app.schemas.feeds import (
 
 router = APIRouter(prefix="/feeds", tags=["feeds"], dependencies=[Depends(require_access_token)])
 UowDep = Annotated[UoW, Depends(get_uow)]
-log = logging.getLogger("gsm.api.feeds")
+log = logging.getLogger(__name__)
 
 
 @router.get(

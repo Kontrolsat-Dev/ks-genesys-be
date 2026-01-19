@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import get_uow
 from app.infra.uow import UoW
@@ -57,10 +57,7 @@ def get_order(
     uow: Annotated[UoW, Depends(get_uow)],
 ) -> DropshippingOrderOut:
     """Obter detalhes de uma encomenda."""
-    try:
-        return uc_get_order.execute(uow=uow, order_id=order_id)
-    except uc_get_order.OrderNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+    return uc_get_order.execute(uow=uow, order_id=order_id)
 
 
 # --------------------- Linhas ---------------------
@@ -83,19 +80,14 @@ def select_supplier_for_line(
     uow: Annotated[UoW, Depends(get_uow)],
 ) -> dict:
     """Selecionar fornecedor para uma linha."""
-    try:
-        line_id_result = uc_select_supplier.execute(
-            uow=uow,
-            order_id=order_id,
-            line_id=line_id,
-            id_supplier=payload.id_supplier,
-            supplier_cost=payload.supplier_cost,
-        )
-        return {"success": True, "line_id": line_id_result}
-    except uc_select_supplier.LineNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except uc_select_supplier.LineNotPendingError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    line_id_result = uc_select_supplier.execute(
+        uow=uow,
+        order_id=order_id,
+        line_id=line_id,
+        id_supplier=payload.id_supplier,
+        supplier_cost=payload.supplier_cost,
+    )
+    return {"success": True, "line_id": line_id_result}
 
 
 # --------------------- Importação ---------------------

@@ -12,7 +12,7 @@ from decimal import Decimal
 from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
 
-log = logging.getLogger("gsm.dropshipping.import_orders")
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -77,8 +77,7 @@ def execute(
                     result.errors += 1
                     msg = f"Encomenda {item.get('id_order')}: {e}"
                     result.error_messages.append(msg)
-                    log.warning("import_orders erro order=%s: %s",
-                                item.get("id_order"), e)
+                    log.warning("import_orders erro order=%s: %s", item.get("id_order"), e)
 
             # Se retornou menos que page_size, não há mais páginas
             if len(items) < page_size:
@@ -139,10 +138,8 @@ def _import_order(
         payment_method=item.get("payment"),
         total_paid_tax_incl=Decimal(str(item.get("total_paid_tax_incl", 0))),
         total_paid_tax_excl=Decimal(str(item.get("total_paid_tax_excl", 0))),
-        total_shipping_tax_incl=Decimal(
-            str(item.get("total_shipping_tax_incl", 0))),
-        total_shipping_tax_excl=Decimal(
-            str(item.get("total_shipping_tax_excl", 0))),
+        total_shipping_tax_incl=Decimal(str(item.get("total_shipping_tax_incl", 0))),
+        total_shipping_tax_excl=Decimal(str(item.get("total_shipping_tax_excl", 0))),
         ps_date_add=ps_date_add,
         ps_date_upd=ps_date_upd,
     )
@@ -182,10 +179,8 @@ def _import_order(
             qty=ln["qty"],
             unit_price_tax_excl=Decimal(str(ln.get("unit_price_tax_excl", 0))),
             unit_price_tax_incl=Decimal(str(ln.get("unit_price_tax_incl", 0))),
-            total_price_tax_excl=Decimal(
-                str(ln.get("total_price_tax_excl", 0))),
-            total_price_tax_incl=Decimal(
-                str(ln.get("total_price_tax_incl", 0))),
+            total_price_tax_excl=Decimal(str(ln.get("total_price_tax_excl", 0))),
+            total_price_tax_incl=Decimal(str(ln.get("total_price_tax_incl", 0))),
             id_product=id_product,
         )
         imported_lines += 1

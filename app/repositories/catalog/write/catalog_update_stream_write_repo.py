@@ -10,7 +10,7 @@ from app.models.catalog_update_stream import CatalogUpdateStream
 from app.models.product import Product
 from app.models.product_active_offer import ProductActiveOffer
 
-log = logging.getLogger("gsm.catalog.update_stream")
+log = logging.getLogger(__name__)
 
 
 class CatalogUpdateStreamWriteRepository:

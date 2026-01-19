@@ -10,7 +10,7 @@ from requests.exceptions import ConnectTimeout, ReadTimeout, Timeout, Connection
 
 from app.core.config import settings
 
-log = logging.getLogger("gsm.external.prestashop_client")
+log = logging.getLogger(__name__)
 
 
 def _mask_email(email: str) -> str:

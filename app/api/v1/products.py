@@ -46,7 +46,7 @@ from app.external.prestashop_client import PrestashopClient
 router = APIRouter(
     prefix="/products", tags=["products"], dependencies=[Depends(require_access_token)]
 )
-log = logging.getLogger("gsm.api.products")
+log = logging.getLogger(__name__)
 
 # Aqui está o Depends já embutido
 UowDep = Annotated[UoW, Depends(get_uow)]

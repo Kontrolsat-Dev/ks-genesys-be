@@ -9,7 +9,7 @@ from typing import Any
 
 from app.external.feed_downloader import FeedDownloader, parse_rows_json, parse_rows_csv
 
-log = logging.getLogger("gsm.ingest")
+log = logging.getLogger(__name__)
 
 
 class FeedHttpError(Exception):

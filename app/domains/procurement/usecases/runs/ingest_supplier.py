@@ -32,7 +32,7 @@ from app.repositories.procurement.write.supplier_item_write_repo import (
     SupplierItemWriteRepository,
 )
 
-log = logging.getLogger("gsm.ingest")
+log = logging.getLogger(__name__)
 
 
 async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> dict[str, Any]:

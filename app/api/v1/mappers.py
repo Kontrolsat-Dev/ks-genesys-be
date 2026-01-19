@@ -28,7 +28,7 @@ from app.schemas.mappers import (
 router = APIRouter(
     prefix="/mappers", tags=["mappers"], dependencies=[Depends(require_access_token)]
 )
-log = logging.getLogger("gsm.api.mappers")
+log = logging.getLogger(__name__)
 UowDep = Annotated[UoW, Depends(get_uow)]
 
 

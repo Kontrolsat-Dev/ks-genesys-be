@@ -12,7 +12,7 @@ from app.domains.catalog.services.active_offer import (
 from app.domains.catalog.services.sync_events import emit_product_state_event
 from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 
-log = logging.getLogger("gsm.ingest")
+log = logging.getLogger(__name__)
 
 
 def sync_active_offer_for_products(

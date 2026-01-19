@@ -23,7 +23,7 @@ from app.repositories.procurement.write.supplier_item_write_repo import (
     SupplierItemWriteRepository,
 )
 
-log = logging.getLogger("gsm.ingest")
+log = logging.getLogger(__name__)
 
 CANON_PRODUCT_KEYS = {
     "gtin",

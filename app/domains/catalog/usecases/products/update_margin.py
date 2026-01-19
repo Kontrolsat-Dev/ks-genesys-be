@@ -18,7 +18,7 @@ from app.domains.catalog.services.sync_events import emit_product_state_event
 from app.infra.uow import UoW
 from app.domains.audit.services.audit_service import AuditService
 
-log = logging.getLogger("gsm.catalog.update_margin")
+log = logging.getLogger(__name__)
 
 
 def execute(
@@ -116,13 +116,11 @@ def execute(
         raise
     except IntegrityError as err:
         uow.rollback()
-        log.exception(
-            "Integrity error while updating margin for product id=%s", id_product)
+        log.exception("Integrity error while updating margin for product id=%s", id_product)
         raise BadRequest("Could not update product margin") from err
     except Exception as err:
         uow.rollback()
-        log.exception(
-            "Unexpected error while updating margin for product id=%s", id_product)
+        log.exception("Unexpected error while updating margin for product id=%s", id_product)
         raise BadRequest("Could not update product margin") from err
 
     # Devolver o detalhe já com a margin aplicada e, se for o caso, a active_offer recalculada

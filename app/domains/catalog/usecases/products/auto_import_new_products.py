@@ -18,7 +18,7 @@ from app.models.category import Category
 from app.domains.catalog.usecases.products import import_to_prestashop
 from app.domains.audit.services.audit_service import AuditService
 
-log = logging.getLogger("gsm.catalog.auto_import")
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -120,12 +120,12 @@ def execute(
                     id_ps_category=category.id_ps_category,
                 )
 
-                if import_result.get("success") or import_result.get("id_ecommerce"):
+                if import_result.success or import_result.id_ecommerce:
                     result.imported += 1
                     log.info(
                         "Auto-import: produto %d importado para PS (id_ecommerce=%s)",
                         product.id,
-                        import_result.get("id_ecommerce"),
+                        import_result.id_ecommerce,
                     )
                 else:
                     result.failed += 1

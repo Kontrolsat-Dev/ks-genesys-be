@@ -1,7 +1,7 @@
 # app/infra/bootstrap.py
 import logging
 
-log = logging.getLogger("gsm.bootstrap")
+log = logging.getLogger(__name__)
 
 
 def ensure_recurring_jobs(session_factory) -> dict[str, int]:

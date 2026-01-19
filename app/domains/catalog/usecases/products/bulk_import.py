@@ -14,7 +14,7 @@ from app.schemas.products import BulkImportOut, BulkImportItemResult
 from app.domains.catalog.usecases.products import import_to_prestashop
 from app.domains.audit.services.audit_service import AuditService
 
-log = logging.getLogger("gsm.catalog.bulk_import")
+log = logging.getLogger(__name__)
 
 
 def execute(
@@ -113,8 +113,7 @@ def execute(
                     id_ecommerce=result.get("id_ecommerce"),
                 )
             )
-            log.info("Produto %d importado para PS (ID: %s)",
-                     pid, result.get("id_ecommerce"))
+            log.info("Produto %d importado para PS (ID: %s)", pid, result.get("id_ecommerce"))
 
         except Exception as e:
             failed += 1

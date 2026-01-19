@@ -31,7 +31,7 @@ from app.repositories.worker.write.worker_job_write_repo import (
     WorkerJobWriteRepository,
 )
 
-logger = logging.getLogger("gsm.worker")
+logger = logging.getLogger(__name__)
 
 
 def _utcnow() -> datetime:

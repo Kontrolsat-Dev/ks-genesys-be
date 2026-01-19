@@ -1,9 +1,10 @@
 # app/api/v1/prestashop.py
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import require_access_token, get_prestashop_client
+from app.core.errors import BadRequest
 from app.domains.prestashop.usecases.categories.list_categories import (
     execute as uc_list_ps_categories,
 )
@@ -88,4 +89,4 @@ def get_order_detail(
     try:
         return uc_get_ps_order(id_order=id_order, ps_client=client)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise BadRequest(f"Erro ao obter encomenda do PrestaShop: {e}") from e

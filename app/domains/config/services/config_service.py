@@ -22,7 +22,7 @@ from app.repositories.config.read.platform_config_read_repo import (
     PlatformConfigReadRepository,
 )
 
-log = logging.getLogger("gsm.config")
+log = logging.getLogger(__name__)
 
 
 class ConfigService:

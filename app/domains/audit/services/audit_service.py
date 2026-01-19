@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
 
-log = logging.getLogger("gsm.audit")
+log = logging.getLogger(__name__)
 
 
 class AuditService:

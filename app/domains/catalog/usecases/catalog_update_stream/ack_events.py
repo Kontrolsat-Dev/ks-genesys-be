@@ -21,7 +21,7 @@ from app.repositories.catalog.write.product_active_offer_write_repo import (
     ProductActiveOfferWriteRepository,
 )
 
-log = logging.getLogger("gsm.catalog.ack_events")
+log = logging.getLogger(__name__)
 
 
 def _update_active_offer_from_payload(
@@ -104,8 +104,7 @@ def execute(
         for evt in events:
             _update_active_offer_from_payload(pao_repo, evt)
 
-    updated = uow.catalog_events_w.ack_batch(
-        ids=ids, status=status, error=error)
+    updated = uow.catalog_events_w.ack_batch(ids=ids, status=status, error=error)
     uow.commit()
 
     return {"updated": updated}

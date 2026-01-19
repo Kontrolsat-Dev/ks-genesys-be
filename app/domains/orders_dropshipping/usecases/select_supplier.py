@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from app.core.errors import BadRequest, NotFound
 from app.infra.uow import UoW
 from app.models.orders_dropshipping import OrderStatus
 from app.repositories.orders_dropshipping.read.dropshipping_order_read_repo import (
@@ -16,12 +17,16 @@ from app.repositories.orders_dropshipping.write.dropshipping_order_write_repo im
 )
 
 
-class LineNotFoundError(Exception):
+class LineNotFoundError(NotFound):
     """Linha de encomenda não encontrada."""
 
+    code = "LINE_NOT_FOUND"
 
-class LineNotPendingError(Exception):
+
+class LineNotPendingError(BadRequest):
     """Linha de encomenda não está pendente."""
+
+    code = "LINE_NOT_PENDING"
 
 
 def execute(
