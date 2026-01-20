@@ -4,7 +4,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import require_access_token, get_prestashop_client
-from app.core.errors import BadRequest
 from app.domains.prestashop.usecases.categories.list_categories import (
     execute as uc_list_ps_categories,
 )
@@ -86,7 +85,4 @@ def get_order_detail(
     Obtém detalhes completos de uma encomenda diretamente do PrestaShop via API (JIT).
     Não usa base de dados local.
     """
-    try:
-        return uc_get_ps_order(id_order=id_order, ps_client=client)
-    except Exception as e:
-        raise BadRequest(f"Erro ao obter encomenda do PrestaShop: {e}") from e
+    return uc_get_ps_order(id_order=id_order, ps_client=client)

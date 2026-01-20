@@ -10,6 +10,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
 from app.core.errors import NotFound, InvalidArgument
+from app.domains.catalog.services.best_offer_service import find_best_offer_from_dicts
 from app.domains.audit.services.audit_service import AuditService
 from app.schemas.products import ProductImportOut
 
@@ -43,15 +44,10 @@ def execute(
         raise NotFound(f"Produto {id_product} não encontrado")
 
     if product.id_ecommerce:
-        raise InvalidArgument(
-            f"Produto {id_product} já importado (PS ID: {product.id_ecommerce})"
-        )
+        raise InvalidArgument(f"Produto {id_product} já importado (PS ID: {product.id_ecommerce})")
 
     # Obter ofertas e encontrar a melhor (menor custo efetivo)
-    from app.domains.catalog.services.best_offer_service import find_best_offer_from_dicts
-
-    offers = uow.supplier_items.list_offers_for_product(
-        id_product, only_in_stock=False)
+    offers = uow.supplier_items.list_offers_for_product(id_product, only_in_stock=False)
 
     # Encontrar melhor oferta (sem exigir stock para import)
     # O desconto vem do campo supplier_discount no dict
@@ -65,8 +61,7 @@ def execute(
             brand_name = brand.name
 
     # Obter categoria para herança de taxas default
-    category = uow.categories.get(
-        product.id_category) if product.id_category else None
+    category = uow.categories.get(product.id_category) if product.id_category else None
 
     # Verificar país do fornecedor da melhor oferta
     # Só aplicamos taxas (ecotax, extra_fees) se fornecedor NÃO é de Portugal
@@ -82,8 +77,7 @@ def execute(
     # Determinar ecotax e extra_fees (produto tem precedência, se não usa default da categoria)
     if apply_taxes:
         ecotax = (
-            product.ecotax if product.ecotax > 0 else (
-                category.default_ecotax if category else 0)
+            product.ecotax if product.ecotax > 0 else (category.default_ecotax if category else 0)
         )
         extra_fees = (
             product.extra_fees
@@ -101,8 +95,7 @@ def execute(
     cost: Decimal | None = None
 
     if best_offer:
-        cost = Decimal(best_offer["price"]) if best_offer.get(
-            "price") else None
+        cost = Decimal(best_offer["price"]) if best_offer.get("price") else None
         stock = best_offer.get("stock") or 0
 
         if cost is not None:
@@ -112,21 +105,18 @@ def execute(
 
             # Aplicar desconto do fornecedor ao custo (se existir)
             # custo_descontado = custo × (1 - desconto)
-            supplier_discount = Decimal(
-                str(best_offer.get("supplier_discount") or 0))
+            supplier_discount = Decimal(str(best_offer.get("supplier_discount") or 0))
             discounted_cost = cost * (1 - supplier_discount)
 
             # Preço = (custo_descontado × (1 + margem)) + ecotax + extra_fees
             margin = Decimal(str(product.margin or 0))
             price_with_margin = discounted_cost * (1 + margin)
             raw_sale_price = float(
-                price_with_margin +
-                Decimal(str(ecotax)) + Decimal(str(extra_fees))
+                price_with_margin + Decimal(str(ecotax)) + Decimal(str(extra_fees))
             )
             sale_price = round_to_pretty_price(raw_sale_price)
             price_str = str(
-                Decimal(str(sale_price)).quantize(
-                    Decimal("0.01"), rounding=ROUND_HALF_UP)
+                Decimal(str(sale_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             )
 
     # Construir payload para PrestaShop
@@ -159,8 +149,7 @@ def execute(
             uow.active_offers_w.upsert(
                 id_product=id_product,
                 id_supplier=best_offer.get("id_supplier"),
-                id_supplier_item=best_offer.get(
-                    "id") or best_offer.get("id_supplier_item"),
+                id_supplier_item=best_offer.get("id") or best_offer.get("id_supplier_item"),
                 unit_cost=float(cost) if cost is not None else None,
                 unit_price_sent=float(price_str) if price_str else None,
                 stock_sent=stock,

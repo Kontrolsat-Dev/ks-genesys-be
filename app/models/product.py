@@ -29,7 +29,7 @@ class Product(Base):
     margin: Mapped[float] = mapped_column(Numeric(7, 4), nullable=False, default=0)
 
     # Taxas adicionais
-    ecotax: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0)
+    ecotax: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0)  # Remover
     extra_fees: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0)
 
     is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

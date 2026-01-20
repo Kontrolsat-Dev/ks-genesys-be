@@ -26,7 +26,7 @@ from app.domains.catalog.usecases.products.list_catalog_price_changes import (
 from app.domains.catalog.usecases.products.get_product_facets import (
     execute as uc_get_product_facets,
 )
-from app.domains.catalog.usecases.products import import_to_prestashop as uc_import_product
+from app.domains.catalog.usecases.products.import_to_prestashop import execute as uc_import_product
 from app.domains.catalog.usecases.products import bulk_import as uc_bulk_import
 from app.infra.uow import UoW
 from app.schemas.products import (
@@ -382,9 +382,9 @@ def import_product_to_prestashop(
 
     - Valida que o produto existe e não está já importado
     - Envia dados para a API do PrestaShop (r_genesys module)
-    - Actualiza o product.id_ecommerce com o ID do PS
+    - Atualiza o product.id_ecommerce com o ID do PS
     """
-    return uc_import_product.execute(
+    return uc_import_product(
         uow,
         ps_client,
         id_product=id_product,

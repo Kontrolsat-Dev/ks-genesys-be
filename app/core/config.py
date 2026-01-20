@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     PS_IMPORT_PRODUCT_URL: str
     PS_GET_ORDERS_URL: str
     PS_GET_ORDER_URL: str
+    # Sage
+    SAGE_BASE_URL: str = "https://sageapi.example.com"
+    SAGE_USER_AGENT: str = "genesys/2.0"
+    SAGE_ACCESS_CLIENT: str = "sage_access_client"
+    SAGE_ACCESS_SECRET: str = "sage_access_secret"
 
     @property
     def database_url(self) -> str:
