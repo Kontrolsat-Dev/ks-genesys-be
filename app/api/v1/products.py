@@ -48,7 +48,6 @@ router = APIRouter(
 )
 log = logging.getLogger(__name__)
 
-# Aqui está o Depends já embutido
 UowDep = Annotated[UoW, Depends(get_uow)]
 
 

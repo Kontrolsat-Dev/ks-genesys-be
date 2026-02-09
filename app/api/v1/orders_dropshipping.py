@@ -18,16 +18,29 @@ from app.schemas.dropshipping import (
     DropshippingOrderListOut,
     SupplierOrderListOut,
     SelectSupplierIn,
+    SelectSupplierOut,
+    ImportOrdersOut,
     PendingLinesListOut,
 )
-from app.domains.orders_dropshipping.usecases import (
-    list_orders as uc_list_orders,
-    get_order as uc_get_order,
-    select_supplier as uc_select_supplier,
-    list_supplier_orders as uc_list_supplier_orders,
-    import_orders as uc_import_orders,
-    list_pending_lines as uc_list_pending_lines,
+from app.domains.orders_dropshipping.usecases.list_orders import (
+    execute as uc_list_orders,
 )
+from app.domains.orders_dropshipping.usecases.get_order import (
+    execute as uc_get_order,
+)
+from app.domains.orders_dropshipping.usecases.select_supplier import (
+    execute as uc_select_supplier,
+)
+from app.domains.orders_dropshipping.usecases.list_supplier_orders import (
+    execute as uc_list_supplier_orders,
+)
+from app.domains.orders_dropshipping.usecases.import_orders import (
+    execute as uc_import_orders,
+)
+from app.domains.orders_dropshipping.usecases.list_pending_lines import (
+    execute as uc_list_pending_lines,
+)
+
 
 router = APIRouter(prefix="/orders-dropshipping", tags=["orders-dropshipping"])
 
@@ -43,7 +56,7 @@ def list_orders(
     status: OrderStatus | None = None,
 ) -> DropshippingOrderListOut:
     """Listar encomendas dropshipping."""
-    return uc_list_orders.execute(
+    return uc_list_orders(
         uow=uow,
         page=page,
         page_size=page_size,
@@ -57,7 +70,7 @@ def get_order(
     uow: Annotated[UoW, Depends(get_uow)],
 ) -> DropshippingOrderOut:
     """Obter detalhes de uma encomenda."""
-    return uc_get_order.execute(uow=uow, order_id=order_id)
+    return uc_get_order(uow=uow, order_id=order_id)
 
 
 # --------------------- Linhas ---------------------
@@ -69,51 +82,53 @@ def list_pending_lines(
     status: OrderStatus | None = Query(None, description="Filtrar por estado"),
 ) -> PendingLinesListOut:
     """Lista linhas com ofertas disponíveis de fornecedores."""
-    return uc_list_pending_lines.execute(uow=uow, status=status)
+    return uc_list_pending_lines(uow=uow, status=status)
 
 
-@router.post("/orders/{order_id}/lines/{line_id}/select-supplier")
+@router.post(
+    "/orders/{order_id}/lines/{line_id}/select-supplier",
+    response_model=SelectSupplierOut,
+)
 def select_supplier_for_line(
     order_id: int,
     line_id: int,
     payload: SelectSupplierIn,
     uow: Annotated[UoW, Depends(get_uow)],
-) -> dict:
+) -> SelectSupplierOut:
     """Selecionar fornecedor para uma linha."""
-    line_id_result = uc_select_supplier.execute(
+    line_id_result = uc_select_supplier(
         uow=uow,
         order_id=order_id,
         line_id=line_id,
         id_supplier=payload.id_supplier,
         supplier_cost=payload.supplier_cost,
     )
-    return {"success": True, "line_id": line_id_result}
+    return SelectSupplierOut(line_id=line_id_result)
 
 
 # --------------------- Importação ---------------------
 
 
-@router.post("/import")
+@router.post("/import", response_model=ImportOrdersOut)
 def trigger_import(
     uow: Annotated[UoW, Depends(get_uow)],
     since: str | None = Query(None, description="Filtrar por date_upd >= since (YYYY-MM-DD)"),
-) -> dict:
+) -> ImportOrdersOut:
     """Importar manualmente encomendas dropshipping do PrestaShop."""
     ps_client = PrestashopClient()
 
-    result = uc_import_orders.execute(
+    result = uc_import_orders(
         uow=uow,
         ps_client=ps_client,
         since=since,
     )
 
-    return {
-        "success": True,
-        "total_fetched": result.total_fetched,
-        "imported": result.imported,
-        "skipped": result.skipped,
-        "errors": result.errors,
-    }
+    return ImportOrdersOut(
+        total_fetched=result.total_fetched,
+        imported=result.imported,
+        skipped=result.skipped,
+        errors=result.error_messages or [],
+    )
 
 
 # --------------------- Pedidos a Fornecedores ---------------------
@@ -128,7 +143,7 @@ def list_supplier_orders(
     status: str | None = None,
 ) -> SupplierOrderListOut:
     """Listar pedidos a fornecedores."""
-    return uc_list_supplier_orders.execute(
+    return uc_list_supplier_orders(
         uow=uow,
         page=page,
         page_size=page_size,

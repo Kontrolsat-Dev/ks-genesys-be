@@ -218,6 +218,23 @@ class SelectSupplierIn(BaseModel):
     supplier_cost: Decimal | None = None
 
 
+class SelectSupplierOut(BaseModel):
+    """Resposta de seleção de fornecedor."""
+
+    success: bool = True
+    line_id: int
+
+
+class ImportOrdersOut(BaseModel):
+    """Resposta de importação de encomendas."""
+
+    success: bool = True
+    total_fetched: int
+    imported: int
+    skipped: int
+    errors: list[str] = []
+
+
 class ConfirmSupplierOrderIn(BaseModel):
     """Payload para confirmar pedido ao fornecedor."""
 

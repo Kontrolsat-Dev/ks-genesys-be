@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.core.deps import get_uow
+from app.core.deps import get_uow, require_access_token
 from app.infra.uow import UoW
 from app.domains.config.usecases import list_configs
 from app.domains.config.usecases import get_config
@@ -20,7 +20,7 @@ from app.schemas.config import (
     PlatformConfigSeedOut,
 )
 
-router = APIRouter(prefix="/config", tags=["config"])
+router = APIRouter(prefix="/config", tags=["config"], dependencies=[Depends(require_access_token)])
 
 
 @router.get("", response_model=PlatformConfigListOut)

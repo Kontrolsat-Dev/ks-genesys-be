@@ -10,7 +10,7 @@ from datetime import datetime
 
 from app.infra.uow import UoW
 from app.repositories.audit.read.audit_log_read_repo import AuditLogReadRepository
-from app.schemas.audit import AuditLogOut, AuditLogListResponse
+from app.schemas.audit import AuditLogOut, AuditLogListOut
 
 
 def execute(
@@ -24,7 +24,7 @@ def execute(
     to_date: datetime | None = None,
     page: int = 1,
     page_size: int = 50,
-) -> AuditLogListResponse:
+) -> AuditLogListOut:
     """
     Lista audit logs com filtros e paginação.
 
@@ -43,7 +43,7 @@ def execute(
         page_size=page_size,
     )
 
-    return AuditLogListResponse(
+    return AuditLogListOut(
         items=[_to_out(log) for log in items],
         total=total,
         page=page,

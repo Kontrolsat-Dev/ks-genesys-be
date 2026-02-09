@@ -12,15 +12,22 @@ from app.schemas.categories import (
     CategoryMappingOut,
 )
 from app.domains.catalog.usecases.categories import list_categories as uc_list
-from app.domains.catalog.usecases.categories import update_category_mapping as uc_update_mapping
-from app.domains.catalog.usecases.categories import delete_category_mapping as uc_delete_mapping
-from app.domains.catalog.usecases.categories import list_mapped_categories as uc_list_mapped
+from app.domains.catalog.usecases.categories import (
+    update_category_mapping as uc_update_mapping,
+)
+from app.domains.catalog.usecases.categories import (
+    delete_category_mapping as uc_delete_mapping,
+)
+from app.domains.catalog.usecases.categories import (
+    list_mapped_categories as uc_list_mapped,
+)
 
 router = APIRouter(
     prefix="/categories",
     tags=["categories"],
     dependencies=[Depends(require_access_token)],
 )
+
 UowDep = Annotated[UoW, Depends(get_uow)]
 
 

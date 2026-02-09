@@ -25,12 +25,12 @@ class AuditLogOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class AuditLogListResponse(BaseModel):
+class AuditLogListOut(BaseModel):
     items: list[AuditLogOut]
     total: int
     page: int
     page_size: int
 
 
-class EventTypesResponse(BaseModel):
+class EventTypesOut(BaseModel):
     event_types: list[str]

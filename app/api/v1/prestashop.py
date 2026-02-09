@@ -18,6 +18,7 @@ from app.external.prestashop_client import PrestashopClient
 from app.schemas.prestashop import (
     PrestashopCategoriesOut,
     PrestashopBrandsOut,
+    PrestashopOrdersDropshippingOut,
     PrestashopOrderDetailOut,
 )
 
@@ -35,7 +36,7 @@ router = APIRouter(
 )
 def get_categories(
     client: PrestashopClient = Depends(get_prestashop_client),
-):
+) -> PrestashopCategoriesOut:
     """
     Obtém a árvore de categorias do PrestaShop via módulo r_genesys.
     Inclui hierarquia completa (parent, children) e estado de cada categoria.
@@ -51,7 +52,7 @@ def get_categories(
 )
 def get_brands(
     client: PrestashopClient = Depends(get_prestashop_client),
-):
+) -> PrestashopBrandsOut:
     """
     Obtém a lista de marcas registadas no PrestaShop via módulo r_genesys.
     Inclui ID, nome e metadados de cada marca.
@@ -62,13 +63,14 @@ def get_brands(
 
 @router.get(
     path="/orders-dropshipping",
+    response_model=PrestashopOrdersDropshippingOut,
     summary="Listar linhas de encomendas dropshipping",
 )
 def get_orders(
     client: PrestashopClient = Depends(get_prestashop_client),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1),
-):
+) -> PrestashopOrdersDropshippingOut:
     return uc_list_orders_dropshipping(page=page, page_size=page_size, ps_client=client)
 
 
@@ -80,7 +82,7 @@ def get_orders(
 def get_order_detail(
     id_order: int,
     client: PrestashopClient = Depends(get_prestashop_client),
-):
+) -> PrestashopOrderDetailOut:
     """
     Obtém detalhes completos de uma encomenda diretamente do PrestaShop via API (JIT).
     Não usa base de dados local.
