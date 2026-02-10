@@ -11,6 +11,7 @@ from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
 from app.core.errors import NotFound, InvalidArgument
 from app.domains.catalog.services.best_offer_service import find_best_offer_from_dicts
+from app.domains.catalog.services.price_service import compute_sale_price
 from app.domains.audit.services.audit_service import AuditService
 from app.schemas.products import ProductImportOut
 
@@ -28,9 +29,9 @@ def execute(
     Passos:
     1. Obter produto da base de dados
     2. Obter melhor oferta (menor preço)
-    3. Verificar país do fornecedor - taxas só aplicam se país != PT
+    3. Verificar país do fornecedor - ecotax só aplica se país != PT (extra_fees aplicam sempre)
     4. Aplicar desconto do fornecedor ao custo (se existir)
-    5. Calcular preço: (custo_descontado × (1 + margem)) + ecotax + extra_fees
+    5. Calcular preço via PriceService: (custo_descontado × (1 + margem)) + ecotax + extra_fees + arredondamento
     6. Construir payload para PrestaShop
     7. Chamar API do PrestaShop
     8. Atualizar produto com id_ecommerce e active_offer
@@ -63,61 +64,34 @@ def execute(
     # Obter categoria para herança de taxas default
     category = uow.categories.get(product.id_category) if product.id_category else None
 
-    # Verificar país do fornecedor da melhor oferta
-    # Só aplicamos taxas (ecotax, extra_fees) se fornecedor NÃO é de Portugal
     supplier_country: str | None = None
+    supplier = None
     if best_offer and best_offer.get("id_supplier"):
         supplier = uow.suppliers.get(best_offer["id_supplier"])
         if supplier:
             supplier_country = supplier.country
 
-    # Taxas só se aplicam se país != PT (ou país não definido trata como não-PT)
-    apply_taxes = supplier_country is None or supplier_country.upper() != "PT"
-
-    # Determinar ecotax e extra_fees (produto tem precedência, se não usa default da categoria)
-    if apply_taxes:
-        ecotax = (
-            product.ecotax if product.ecotax > 0 else (category.default_ecotax if category else 0)
-        )
-        extra_fees = (
-            product.extra_fees
-            if product.extra_fees > 0
-            else (category.default_extra_fees if category else 0)
-        )
-    else:
-        # Fornecedor português - não aplicar taxas adicionais
-        ecotax = 0
-        extra_fees = 0
-
-    # Calcular preço: (custo × margem) + ecotax + taxas adicionais
+    # Calcular preço via serviço centralizado (aplica margens, ecotax, extra_fees)
     price_str: str | None = None
     stock: int | None = None
-    cost: Decimal | None = None
+    ecotax_used: float | None = None
+    raw_cost: Decimal | None = None
 
     if best_offer:
-        cost = Decimal(best_offer["price"]) if best_offer.get("price") else None
         stock = best_offer.get("stock") or 0
-
-        if cost is not None:
-            from app.domains.catalog.services.price_rounding import (
-                round_to_pretty_price,
-            )
-
-            # Aplicar desconto do fornecedor ao custo (se existir)
-            # custo_descontado = custo × (1 - desconto)
-            supplier_discount = Decimal(str(best_offer.get("supplier_discount") or 0))
-            discounted_cost = cost * (1 - supplier_discount)
-
-            # Preço = (custo_descontado × (1 + margem)) + ecotax + extra_fees
-            margin = Decimal(str(product.margin or 0))
-            price_with_margin = discounted_cost * (1 + margin)
-            raw_sale_price = float(
-                price_with_margin + Decimal(str(ecotax)) + Decimal(str(extra_fees))
-            )
-            sale_price = round_to_pretty_price(raw_sale_price)
+        raw_cost = Decimal(str(best_offer.get("price"))) if best_offer.get("price") else None
+        calc = compute_sale_price(
+            product=product,
+            category=category,
+            supplier_country=supplier_country,
+            cost=best_offer.get("price"),
+            supplier_discount=best_offer.get("supplier_discount"),
+        )
+        if calc:
             price_str = str(
-                Decimal(str(sale_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                Decimal(str(calc.sale_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             )
+            ecotax_used = calc.ecotax
 
     # Construir payload para PrestaShop
     payload = {
@@ -131,7 +105,7 @@ def execute(
         "image_url": product.image_url,
         "weight": product.weight_str,
         "brand_name": brand_name,
-        "ecotax": str(ecotax) if ecotax else None,
+        "ecotax": str(ecotax_used) if ecotax_used else None,
     }
 
     # Chamar API do PrestaShop
@@ -150,7 +124,7 @@ def execute(
                 id_product=id_product,
                 id_supplier=best_offer.get("id_supplier"),
                 id_supplier_item=best_offer.get("id") or best_offer.get("id_supplier_item"),
-                unit_cost=float(cost) if cost is not None else None,
+                unit_cost=float(raw_cost) if raw_cost is not None else None,
                 unit_price_sent=float(price_str) if price_str else None,
                 stock_sent=stock,
             )

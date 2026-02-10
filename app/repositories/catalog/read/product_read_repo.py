@@ -382,6 +382,8 @@ class ProductReadRepository:
                 Product.partnumber,
                 Product.name,
                 Product.margin,
+                Product.ecotax,
+                Product.extra_fees,
                 Product.description,
                 Product.image_url,
                 Product.weight_str,
@@ -389,6 +391,8 @@ class ProductReadRepository:
                 Product.updated_at,
                 b.name.label("brand_name"),
                 c.name.label("category_name"),
+                c.default_ecotax.label("category_ecotax"),
+                c.default_extra_fees.label("category_extra_fees"),
             )
             .select_from(Product)
             .join(b, b.id == Product.id_brand, isouter=True)

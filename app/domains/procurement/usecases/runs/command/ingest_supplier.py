@@ -16,21 +16,6 @@ from app.domains.procurement.services import (
 )
 from app.external.feed_downloader import FeedDownloader
 from app.infra.uow import UoW
-from app.repositories.catalog.read.product_read_repo import ProductReadRepository
-from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
-from app.repositories.procurement.read.feed_run_read_repo import FeedRunReadRepository
-from app.repositories.procurement.read.mapper_read_repo import MapperReadRepository
-from app.repositories.procurement.read.supplier_feed_read_repo import (
-    SupplierFeedReadRepository,
-)
-from app.repositories.procurement.read.supplier_read_repo import SupplierReadRepository
-from app.repositories.procurement.write.feed_run_write_repo import FeedRunWriteRepository
-from app.repositories.procurement.write.product_event_write_repo import (
-    ProductEventWriteRepository,
-)
-from app.repositories.procurement.write.supplier_item_write_repo import (
-    SupplierItemWriteRepository,
-)
 
 log = logging.getLogger(__name__)
 
@@ -54,30 +39,16 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
          no CatalogUpdateStream (prioridade em função da transição de stock).
     6) Finaliza FeedRun (ok/erro) e devolve resumo.
     """
-    db = uow.db
-
-    # --- Repositórios (CQRS) ---
-    run_r = FeedRunReadRepository(db)
-    run_w = FeedRunWriteRepository(db)
-
-    sup_r = SupplierReadRepository(db)
-    feed_r = SupplierFeedReadRepository(db)
-    mapper_r = MapperReadRepository(db)
-    prod_r = ProductReadRepository(db)
-
-    prod_w = ProductWriteRepository(db)
-    item_w = SupplierItemWriteRepository(db)
-    ev_w = ProductEventWriteRepository(db)
 
     # --- 1) Supplier + Feed + Run ---
-    supplier = sup_r.get_required(id_supplier)
+    supplier = uow.suppliers.get_required(id_supplier)
     supplier_margin = float(supplier.margin or 0.0)
 
-    feed = feed_r.get_by_supplier(id_supplier)
+    feed = uow.feeds.get_by_supplier(id_supplier)
     if not feed or not feed.active:
         raise NotFound("Feed not found for supplier")
 
-    run = run_w.start(id_feed=feed.id)
+    run = uow.feed_runs_w.start(id_feed=feed.id)
     id_run = run.id
     uow.commit()
 
@@ -123,7 +94,7 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
                 log_prefix=f"run={id_run}",
             )
         except FeedHttpError as http_err:
-            run_w.finalize_http_error(
+            uow.feed_runs_w.finalize_http_error(
                 id_run,
                 http_status=http_err.status_code,
                 error_msg=http_err.message,
@@ -149,7 +120,7 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
         )
 
         # --- 3) Mapping + persistência linha-a-linha ---
-        profile = mapper_r.profile_for_feed(feed.id)  # {} se não existir/for inválido
+        profile = uow.mappers.profile_for_feed(feed.id)  # {} se não existir/for inválido
         engine = IngestEngine(profile)
 
         affected_products: set[int] = set()
@@ -157,16 +128,13 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
 
         for idx, raw_row in enumerate(rows, 1):
             ok_inc, bad_inc, changed_inc, product_id = process_row(
-                db=db,
+                uow=uow,
                 raw_row=raw_row,
                 row_index=idx,
                 id_run=id_run,
                 id_supplier=id_supplier,
                 feed=feed,
                 engine=engine,
-                prod_w=prod_w,
-                item_w=item_w,
-                ev_w=ev_w,
                 supplier_margin=supplier_margin,
             )
             ok += ok_inc
@@ -186,7 +154,7 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
                 )
 
         # --- 4) Itens não vistos neste run (stock -> 0 por feed) ---
-        unseen_res = ev_w.mark_unseen_items_stock_zero(
+        unseen_res = uow.product_events_w.mark_unseen_items_stock_zero(
             id_feed=feed.id,
             id_supplier=id_supplier,
             id_feed_run=id_run,
@@ -199,14 +167,13 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
 
         # --- 5) Active offer + eventos de estado (apenas para produtos com id_ecommerce) ---
         sync_active_offer_for_products(
-            db,
-            prod_r,
+            uow,
             affected_products=affected_products,
             reason="ingest_supplier",
         )
 
         # --- 6) Finalizar run + commit ---
-        run_w.finalize_ok(
+        uow.feed_runs_w.finalize_ok(
             id_run,
             rows_total=total,
             rows_changed=changed,
@@ -216,7 +183,7 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
         )
         uow.commit()
 
-        status = (run_r.get(id_run) or run).status
+        status = (uow.feed_runs.get(id_run) or run).status
         log.info(
             "[run=%s] done status=%s total=%s ok=%s bad=%s changed=%s unseen_total=%s",
             id_run,
@@ -244,17 +211,17 @@ async def execute(uow: UoW, *, id_supplier: int, limit: int | None = None) -> di
     except Exception as e:  # noqa: BLE001
         # Hard-fail da run
         with suppress(Exception):
-            db.rollback()
+            uow.db.rollback()
 
         try:
-            run_w.finalize_error(
+            uow.feed_runs_w.finalize_error(
                 id_run,
                 error_msg=f"{type(e).__name__}: {e}",
             )
             uow.commit()
         except Exception:
             with suppress(Exception):
-                db.rollback()
+                uow.db.rollback()
 
         log.exception("[run=%s] ingest failed", id_run)
         return {"ok": False, "id_run": id_run, "error": str(e)}

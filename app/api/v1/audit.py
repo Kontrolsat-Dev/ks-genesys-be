@@ -12,9 +12,11 @@ from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import require_access_token, get_uow
 from app.infra.uow import UoW
-from app.domains.audit.usecases.list_logs import execute as uc_list_logs
-from app.domains.audit.usecases.get_log import execute as uc_get_log
-from app.domains.audit.usecases.get_event_types import execute as uc_get_event_types
+from app.domains.audit.usecases.query import (
+    list_logs as uc_list_logs,
+    get_log as uc_get_log,
+    get_event_types as uc_get_event_types,
+)
 
 from app.schemas.audit import AuditLogOut, AuditLogListOut, EventTypesOut
 

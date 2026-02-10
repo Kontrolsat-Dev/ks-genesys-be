@@ -28,9 +28,9 @@ class Product(Base):
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     margin: Mapped[float] = mapped_column(Numeric(7, 4), nullable=False, default=0)
 
-    # Taxas adicionais
-    ecotax: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0)  # Remover
-    extra_fees: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0)
+    # Taxas adicionais (nullable=True para permitir herança da categoria via NULL)
+    ecotax: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
+    extra_fees: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
 
     is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_eol: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

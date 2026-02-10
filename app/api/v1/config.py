@@ -9,10 +9,8 @@ from fastapi import APIRouter, Depends
 
 from app.core.deps import get_uow, require_access_token
 from app.infra.uow import UoW
-from app.domains.config.usecases import list_configs
-from app.domains.config.usecases import get_config
-from app.domains.config.usecases import update_config
-from app.domains.config.usecases import seed_defaults
+from app.domains.config.usecases.query import list_configs, get_config
+from app.domains.config.usecases.command import update_config, seed_defaults
 from app.schemas.config import (
     PlatformConfigOut,
     PlatformConfigUpdate,

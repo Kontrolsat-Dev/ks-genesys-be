@@ -5,19 +5,19 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, status
 
 from app.core.deps import get_uow, require_access_token
-from app.domains.procurement.usecases.suppliers.create_supplier import (
+from app.domains.procurement.usecases.suppliers.command.create_supplier import (
     execute as uc_create,
 )
-from app.domains.procurement.usecases.suppliers.delete_supplier import (
+from app.domains.procurement.usecases.suppliers.command.delete_supplier import (
     execute as uc_delete,
 )
-from app.domains.procurement.usecases.suppliers.get_supplier_detail import (
+from app.domains.procurement.usecases.suppliers.query.get_supplier_detail import (
     execute as uc_q_detail,
 )
-from app.domains.procurement.usecases.suppliers.list_suppliers import (
+from app.domains.procurement.usecases.suppliers.query.list_suppliers import (
     execute as uc_q_list,
 )
-from app.domains.procurement.usecases.suppliers.update_bundle import (
+from app.domains.procurement.usecases.suppliers.command.update_bundle import (
     execute as uc_update,
 )
 from app.infra.uow import UoW

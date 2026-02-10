@@ -5,8 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, BackgroundTasks
 
 from app.core.deps import get_uow, require_access_token
-from app.domains.procurement.usecases.runs.ingest_supplier import execute as uc_ingest
-from app.domains.procurement.usecases.runs.list_runs import execute as uc_list_runs
+from app.domains.procurement.usecases.runs.command.ingest_supplier import execute as uc_ingest
+from app.domains.procurement.usecases.runs.query.list_runs import execute as uc_list_runs
 from app.infra.session import SessionLocal
 from app.infra.uow import UoW
 from app.schemas.runs import FeedRunListOut

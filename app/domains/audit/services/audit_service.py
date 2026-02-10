@@ -28,7 +28,17 @@ from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
 
+from datetime import datetime
+from decimal import Decimal
+
 log = logging.getLogger(__name__)
+
+
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, (datetime, Decimal)):
+        return str(obj)
+    raise TypeError(f"Type {type(obj)} not serializable")
 
 
 class AuditService:
@@ -61,7 +71,7 @@ class AuditService:
             actor_id=actor_id,
             actor_name=actor_name,
             description=description,
-            details_json=json.dumps(details) if details else None,
+            details_json=json.dumps(details, default=json_serial) if details else None,
         )
         self.db.add(audit_log)
         log.debug("Audit: %s %s:%s by %s", event_type, entity_type, entity_id, actor_id)

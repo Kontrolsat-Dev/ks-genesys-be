@@ -50,6 +50,21 @@ class Settings(BaseSettings):
     SAGE_ACCESS_CLIENT: str = "sage_access_client"
     SAGE_ACCESS_SECRET: str = "sage_access_secret"
 
+    SAGE_GET_ITEM_BY_ID_URL: str = "https://sageapi.example.com/api/v1/items"
+    SAGE_GET_ITEMS_STOCK_CHANGES_URL: str = (
+        "https://sageapi.example.com/api/v1/analysis/items-stock-changes/list"
+    )
+    SAGE_GET_ITEMS_PRICE_CHANGES_URL: str = (
+        "https://sageapi.example.com/api/v1/analysis/items-price-changes/list"
+    )
+    SAGE_GET_TAX_GROUPS_URL: str = "https://sageapi.example.com/api/v1/taxes/list"
+    SAGE_GET_CATEGORIES_LIST_URL: str = "https://sageapi.example.com/api/v1/categories/list"
+    SAGE_GET_CUSTOMER_URL: str = "https://sageapi.example.com/api/v1/customers"
+    SAGE_CREATE_CUSTOMER_URL: str = "https://sageapi.example.com/api/v1/customers"
+    SAGE_CREATE_DOCUMENT_ELO_URL: str = "https://sageapi.example.com/api/v1/sell/online-orders"
+    SAGE_CREATE_ITEM_URL: str = "https://sageapi.example.com/api/v1/items"
+    SAGE_GET_ELO_BY_NUMBER_URL: str = "https://sageapi.example.com/api/v1/sell/online-orders"
+
     @property
     def database_url(self) -> str:
         return (

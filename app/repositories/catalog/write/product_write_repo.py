@@ -1,172 +1,108 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from app.core.errors import InvalidArgument
 from app.models.product import Product
 from app.models.product_meta import ProductMeta
-
-# Importes de write repos para garantir criação de brand/category quando em falta.
-# (usa import local para evitar ciclos, se necessário)
-from app.repositories.catalog.write.brand_write_repo import BrandWriteRepository
-from app.repositories.catalog.write.category_write_repo import CategoryWriteRepository
+from app.repositories.catalog.read.product_read_repo import ProductReadRepository
 
 
-class ProductWriteRepository:
+class ProductWriteRepository(ProductReadRepository):
     """
     Operações de escrita/manutenção de produtos.
-    (Herda implicitamente a possibilidade de fazer lookups simples, mas
-    deixamos os lookups mais ricos no read repo.)
     """
 
-    def __init__(self, db: Session):
-        self.db = db
-
-    # --- Lookups auxiliares para writes (CQRS pragmático) ----------
-    # Usados internamente antes de operações de escrita.
-    # Para queries ricas de leitura, usar ProductReadRepository.
-    def get(self, id_product: int) -> Product | None:
-        return self.db.get(Product, id_product)
-
-    def get_by_gtin(self, gtin: str) -> Product | None:
-        if not gtin:
-            return None
-        gtin_norm = gtin.strip()
-        if not gtin_norm:
-            return None
-        return self.db.scalar(select(Product).where(Product.gtin == gtin_norm))
-
-    def get_by_brand_mpn(self, id_brand: int, partnumber: str) -> Product | None:
-        if not id_brand or not partnumber:
-            return None
-        part_norm = partnumber.strip()
-        if not part_norm:
-            return None
-        stmt = select(Product).where(
-            Product.id_brand == id_brand,
-            Product.partnumber == part_norm,
-        )
-        return self.db.scalar(stmt)
-
-    # --- Escrita -------------------------------------------------
     def get_or_create(
         self,
         *,
-        gtin: str | None,
-        partnumber: str | None,
-        brand_name: str | None,
-        default_margin: float | None,
+        gtin: str | None = None,
+        partnumber: str | None = None,
+        id_brand: int | None = None,
+        default_margin: float | None = None,
     ) -> Product:
         """
-        Regra:
-
-        - Se HÁ GTIN → GTIN manda em tudo:
-            * tenta get_by_gtin(gtin)
-            * se não existir → cria novo Product com esse GTIN
-            * NÃO cai para brand+mpn
-
-        - Se NÃO há GTIN → aí sim usamos brand+MPN para dedupe:
-            * cria/resolve brand por nome (BrandWriteRepository)
-            * tenta get_by_brand_mpn(id_brand, partnumber)
-            * se não existir → cria produto sem GTIN
-
-        - Se não há GTIN nem (brand+mpn) → erro (InvalidArgument).
+        Tenta encontrar por GTIN (prioritário) ou por (partnumber + id_brand).
+        Se não encontrar, cria.
         """
-
         gtin_norm = gtin.strip() if gtin else None
-        part_norm = partnumber.strip() if partnumber else None
-        brand_norm = brand_name.strip() if brand_name else None
+        pn_norm = partnumber.strip() if partnumber else None
 
         # 1) Caso com GTIN → só GTIN conta
         if gtin_norm:
-            # tentar encontrar produto por GTIN
             p = self.get_by_gtin(gtin_norm)
             if p:
                 return p
 
-            # opcionalmente ainda podemos associar brand se vier no feed
-            id_brand = None
-            if brand_norm:
-                id_brand = BrandWriteRepository(self.db).get_or_create(brand_norm).id
+        # 2) Sem GTIN ou não encontrado → tenta PN + Brand
+        if pn_norm and id_brand:
+            p = self.get_by_brand_mpn(id_brand, pn_norm)
+            if p:
+                return p
 
-            p = Product(
-                gtin=gtin_norm,
-                id_brand=id_brand,
-                partnumber=part_norm,
-                margin=(default_margin or 0.0),
-            )
-            self.db.add(p)
-            self.db.flush()
-            return p
+        # 3) Não encontrado → Criar
+        if not gtin_norm and not (pn_norm and id_brand):
+            raise InvalidArgument("Need at least GTIN or (PN + Brand) to get/create")
 
-        # 2) Sem GTIN → podemos usar brand+MPN como chave
-        id_brand = None
-        if brand_norm:
-            id_brand = BrandWriteRepository(self.db).get_or_create(brand_norm).id
-
-        # Sem GTIN e sem (brand+mpn) ⇒ não temos chave
-        if not (id_brand and part_norm):
-            raise InvalidArgument("Missing product key (gtin or brand+mpn)")
-
-        # Tentar dedupe por brand+mpn
-        p = self.get_by_brand_mpn(id_brand, part_norm)
-        if p:
-            return p
-
-        # Criar novo produto sem GTIN (catálogo sem código de barras)
         p = Product(
-            gtin=None,
+            gtin=gtin_norm,
+            partnumber=pn_norm,
             id_brand=id_brand,
-            partnumber=part_norm,
-            margin=(default_margin or 0.0),
+            margin=default_margin,
+            is_eol=False,
         )
         self.db.add(p)
         self.db.flush()
         return p
 
-    def fill_canonicals_if_empty(self, id_product: int, **fields):
-        p = self.db.get(Product, id_product)
-        if not p:
-            return
-        changed = False
-        for k, v in fields.items():
-            if v in (None, ""):
-                continue
-            if getattr(p, k, None) in (None, "", 0):
-                setattr(p, k, v)
-                changed = True
-        if changed:
-            self.db.add(p)
-            self.db.flush()
-
-    def fill_brand_category_if_empty(
+    def fill_canonicals_if_empty(
         self,
         id_product: int,
         *,
-        brand_name: str | None,
-        category_name: str | None,
-        id_supplier: int | None = None,
-    ):
-        p = self.db.get(Product, id_product)
+        name: str | None = None,
+        description: str | None = None,
+        image_url: str | None = None,
+        weight_str: str | None = None,
+        partnumber: str | None = None,
+        gtin: str | None = None,
+    ) -> bool:
+        """
+        Preenche campos canónicos se estiverem vazios.
+        """
+        p = self.get(id_product)
         if not p:
-            return
+            return False
+
         changed = False
-        if brand_name and not p.id_brand:
-            p.id_brand = BrandWriteRepository(self.db).get_or_create(brand_name).id
+
+        if name and not p.name:
+            p.name = name[:255]
             changed = True
-        if category_name and not p.id_category:
-            p.id_category = (
-                CategoryWriteRepository(self.db)
-                .get_or_create(category_name, id_supplier=id_supplier)
-                .id
-            )
+        if description and not p.description:
+            p.description = description
             changed = True
+        if image_url and not p.image_url:
+            p.image_url = image_url[:512]
+            changed = True
+        if weight_str and not p.weight_str:
+            # Note: The model field is weight_str in some places but weight in others?
+            # Let's check Product model.
+            p.weight_str = weight_str[:100]
+            changed = True
+
+        if partnumber and not p.partnumber:
+            p.partnumber = partnumber
+            changed = True
+        if gtin and not p.gtin:
+            p.gtin = gtin
+            changed = True
+
         if changed:
-            self.db.add(p)
             self.db.flush()
 
-    def add_meta_if_missing(self, id_product: int, *, name: str, value: str) -> tuple[bool, bool]:
+        return changed
+
+    def add_meta_if_missing(self, id_product: int, name: str, value: str) -> tuple[bool, bool]:
         row = self.db.scalar(
             select(ProductMeta).where(
                 ProductMeta.id_product == id_product,
@@ -175,36 +111,21 @@ class ProductWriteRepository:
         )
         if row is None:
             self.db.add(ProductMeta(id_product=id_product, name=name, value=value))
-            # flush só se precisares do id
             return True, False
         else:
             return (False, (row.value or "") != (value or ""))
 
     def set_margin(self, id_product: int, margin: float) -> None:
-        """
-        Atualiza apenas a margem do produto.
-
-        Validação semântica (ex.: não permitir < 0) deve ser feita no usecase;
-        aqui o repo só aplica a alteração e faz flush.
-        """
-        p = self.db.get(Product, id_product)
+        p = self.get(id_product)
         if not p:
             return
         p.margin = margin
-        self.db.add(p)
         self.db.flush()
 
     def set_eol(self, id_product: int, is_eol: bool) -> None:
-        """
-        Marca um produto como EOL (End of Life) ou não.
-
-        EOL significa que o produto desapareceu de todos os catálogos de fornecedores
-        (não veio em nenhum feed), não apenas que tem stock = 0.
-        """
-        p = self.db.get(Product, id_product)
+        p = self.get(id_product)
         if not p:
             return
         if p.is_eol != is_eol:
             p.is_eol = is_eol
-            self.db.add(p)
             self.db.flush()

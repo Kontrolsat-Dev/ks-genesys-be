@@ -22,22 +22,22 @@ from app.schemas.dropshipping import (
     ImportOrdersOut,
     PendingLinesListOut,
 )
-from app.domains.orders_dropshipping.usecases.list_orders import (
+from app.domains.orders_dropshipping.usecases.query.list_orders import (
     execute as uc_list_orders,
 )
-from app.domains.orders_dropshipping.usecases.get_order import (
+from app.domains.orders_dropshipping.usecases.query.get_order import (
     execute as uc_get_order,
 )
-from app.domains.orders_dropshipping.usecases.select_supplier import (
+from app.domains.orders_dropshipping.usecases.command.select_supplier import (
     execute as uc_select_supplier,
 )
-from app.domains.orders_dropshipping.usecases.list_supplier_orders import (
+from app.domains.orders_dropshipping.usecases.query.list_supplier_orders import (
     execute as uc_list_supplier_orders,
 )
-from app.domains.orders_dropshipping.usecases.import_orders import (
+from app.domains.orders_dropshipping.usecases.command.import_orders import (
     execute as uc_import_orders,
 )
-from app.domains.orders_dropshipping.usecases.list_pending_lines import (
+from app.domains.orders_dropshipping.usecases.query.list_pending_lines import (
     execute as uc_list_pending_lines,
 )
 

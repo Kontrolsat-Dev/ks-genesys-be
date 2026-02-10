@@ -7,13 +7,13 @@ from collections.abc import Awaitable, Callable
 
 from app.infra.uow import UoW
 from app.core.errors import InvalidArgument
-from app.domains.procurement.usecases.runs.ingest_supplier import (
+from app.domains.procurement.usecases.runs.command.ingest_supplier import (
     execute as uc_ingest_supplier,
 )
-from app.domains.catalog.usecases.products.mark_eol_products import (
+from app.domains.catalog.usecases.products.command.mark_eol_products import (
     execute as uc_mark_eol_products,
 )
-from app.domains.catalog.usecases.products.auto_import_new_products import (
+from app.domains.catalog.usecases.products.command.auto_import_new_products import (
     execute as uc_auto_import_new_products,
 )
 from app.external.prestashop_client import PrestashopClient

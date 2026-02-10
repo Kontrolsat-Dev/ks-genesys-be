@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 from typing import Any
 
 from app.core.errors import InvalidArgument
@@ -15,13 +14,7 @@ from app.core.normalize import (
     normalize_category,
 )
 from app.domains.mapping.engine import IngestEngine
-from app.repositories.catalog.write.product_write_repo import ProductWriteRepository
-from app.repositories.procurement.write.product_event_write_repo import (
-    ProductEventWriteRepository,
-)
-from app.repositories.procurement.write.supplier_item_write_repo import (
-    SupplierItemWriteRepository,
-)
+from app.infra.uow import UoW
 
 log = logging.getLogger(__name__)
 
@@ -80,7 +73,7 @@ def _split_payload(mapped: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
 
 
 def process_row(
-    db: Session,
+    uow: UoW,
     *,
     raw_row: dict[str, Any],
     row_index: int,
@@ -88,9 +81,6 @@ def process_row(
     id_supplier: int,
     feed,
     engine: IngestEngine,
-    prod_w: ProductWriteRepository,
-    item_w: SupplierItemWriteRepository,
-    ev_w: ProductEventWriteRepository,
     supplier_margin: float,
 ) -> tuple[int, int, int, int | None]:
     """
@@ -116,14 +106,23 @@ def process_row(
     brand_name = normalize_simple(raw_brand_name) if raw_brand_name else None
     category_name = normalize_category(raw_category_name) if raw_category_name else None
 
+    # Resolve IDs de marca e categoria de forma orquestrada
+    id_brand = None
+    if brand_name:
+        id_brand = uow.brands_w.get_or_create(brand_name).id
+
+    id_category = None
+    if category_name:
+        id_category = uow.categories_w.get_or_create(category_name, id_supplier=id_supplier).id
+
     changed = 0
 
     # 2) Produto canónico
     try:
-        p = prod_w.get_or_create(
+        p = uow.products_w.get_or_create(
             gtin=gtin,
             partnumber=pn,
-            brand_name=brand_name,
+            id_brand=id_brand,
             default_margin=supplier_margin,
         )
     except InvalidArgument:
@@ -131,14 +130,14 @@ def process_row(
         return 0, 1, 0, None
     except IntegrityError as ie:  # noqa: PERF203
         # race/unique — tenta recuperar
-        db.rollback()
-        p = prod_w.get_by_gtin(gtin) if gtin else None
-        if not p and (brand_name and pn):
+        uow.db.rollback()
+        p = uow.products.get_by_gtin(gtin) if gtin else None
+        if not p and (id_brand and pn):
             try:
-                p = prod_w.get_or_create(
+                p = uow.products_w.get_or_create(
                     gtin=None,
                     partnumber=pn,
-                    brand_name=brand_name,
+                    id_brand=id_brand,
                     default_margin=supplier_margin,
                 )
             except Exception:  # noqa: BLE001
@@ -154,7 +153,7 @@ def process_row(
             return 0, 1, 0, None
 
     # 3) Preencher campos canónicos vazios + brand/category
-    prod_w.fill_canonicals_if_empty(
+    uow.products_w.fill_canonicals_if_empty(
         p.id,
         name=product_payload.get("name"),
         description=product_payload.get("description"),
@@ -163,18 +162,18 @@ def process_row(
         partnumber=pn,
         gtin=gtin,
     )
-    prod_w.fill_brand_category_if_empty(
-        p.id,
-        brand_name=brand_name,
-        category_name=category_name,
-        id_supplier=id_supplier,
-    )
+
+    # Preencher brand/category se ainda não tiver (orquestração explícita)
+    if id_brand and not p.id_brand:
+        p.id_brand = id_brand
+    if id_category and not p.id_category:
+        p.id_category = id_category
 
     # 4) Meta não-canónica
     for k, v in meta_payload.items():
         if v in (None, "", []):
             continue
-        inserted, _conflict = prod_w.add_meta_if_missing(
+        inserted, _conflict = uow.products_w.add_meta_if_missing(
             p.id,
             name=str(k),
             value=str(v),
@@ -187,7 +186,7 @@ def process_row(
     stock = offer_payload["stock"]
     sku = offer_payload["sku"] or (pn or gtin or f"row-{row_index}")
 
-    _item, created, changed_item, old_price, old_stock = item_w.upsert(
+    _item, created, changed_item, old_price, old_stock = uow.supplier_items_w.upsert(
         id_feed=feed.id,
         id_product=p.id,
         sku=sku,
@@ -210,7 +209,7 @@ def process_row(
         )
 
     # 6) Evento por criação/alteração da oferta do supplier
-    changed += ev_w.record_from_item_change(
+    changed += uow.product_events_w.record_from_item_change(
         id_product=p.id,
         id_supplier=id_supplier,
         gtin=gtin,

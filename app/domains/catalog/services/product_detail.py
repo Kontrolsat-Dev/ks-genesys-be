@@ -10,17 +10,6 @@ from app.domains.catalog.services.mappers import (
     map_active_offer_from_pao_to_out,
 )
 from app.infra.uow import UoW
-from app.repositories.catalog.read.product_active_offer_read_repo import (
-    ProductActiveOfferReadRepository,
-)
-from app.repositories.catalog.read.product_meta_read_repo import ProductMetaReadRepository
-from app.repositories.catalog.read.product_read_repo import ProductReadRepository
-from app.repositories.procurement.read.product_event_read_repo import (
-    ProductEventReadRepository,
-)
-from app.repositories.procurement.read.supplier_item_read_repo import (
-    SupplierItemReadRepository,
-)
 from app.schemas.products import (
     ProductOut,
     ProductMetaOut,
@@ -44,11 +33,8 @@ class DetailOptions:
 
 
 def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> ProductDetailOut:
-    db = uow.db
-
     # 1) produto + nomes agregados
-    p_repo = ProductReadRepository(db)
-    row = p_repo.get_product_with_names(id_product)
+    row = uow.products.get_product_with_names(id_product)
     if not row:
         raise NotFound(f"Product {id_product} not found")
 
@@ -57,8 +43,7 @@ def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> Pro
     # 2) meta
     meta_list: list[ProductMetaOut] = []
     if opts.expand_meta:
-        meta_repo = ProductMetaReadRepository(db)
-        meta_rows = meta_repo.list_for_product(p.id)
+        meta_rows = uow.product_meta.list_for_product(p.id)
         meta_list = [
             ProductMetaOut(
                 name=m.name,
@@ -73,8 +58,7 @@ def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> Pro
     offers_in_stock = 0
     suppliers_set: set[int] = set()
     if opts.expand_offers:
-        si_repo = SupplierItemReadRepository(db)
-        offers_raw = si_repo.list_offers_for_product(p.id, only_in_stock=False)
+        offers_raw = uow.supplier_items.list_offers_for_product(p.id, only_in_stock=False)
         for o in offers_raw:
             offer: OfferOut = map_offer_row_to_out(o)
             offers.append(offer)
@@ -91,8 +75,7 @@ def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> Pro
     # 3.2) active_offer = oferta ativa/comunicada (ProductActiveOffer)
     active_offer: OfferOut | None = None
     if p.id_ecommerce and p.id_ecommerce > 0:
-        pao_repo = ProductActiveOfferReadRepository(db)
-        pao = pao_repo.get_by_product(p.id)
+        pao = uow.active_offers.get_by_product(p.id)
         if pao and pao.id_supplier is not None:
             active_offer = map_active_offer_from_pao_to_out(pao)
 
@@ -104,8 +87,9 @@ def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> Pro
     last_change_at = None
 
     if opts.expand_events:
-        ev_repo = ProductEventReadRepository(db)
-        evs = ev_repo.list_events_for_product(p.id, days=opts.events_days, limit=opts.events_limit)
+        evs = uow.product_events.list_events_for_product(
+            p.id, days=opts.events_days, limit=opts.events_limit
+        )
         if evs:
             events_out = [
                 ProductEventOut(

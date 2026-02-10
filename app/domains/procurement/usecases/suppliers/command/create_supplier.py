@@ -42,8 +42,7 @@ def execute(uow: UoW, *, data: SupplierCreate) -> SupplierOut:
 
     except IntegrityError as err:
         uow.rollback()
-        raise Conflict(
-            "Não foi possível criar fornecedor devido a erro de integridade") from err
+        raise Conflict("Não foi possível criar fornecedor devido a erro de integridade") from err
 
     except Exception as err:
         uow.rollback()

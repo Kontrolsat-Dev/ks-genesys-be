@@ -11,15 +11,13 @@ from app.schemas.categories import (
     CategoryMappingIn,
     CategoryMappingOut,
 )
-from app.domains.catalog.usecases.categories import list_categories as uc_list
-from app.domains.catalog.usecases.categories import (
-    update_category_mapping as uc_update_mapping,
-)
-from app.domains.catalog.usecases.categories import (
-    delete_category_mapping as uc_delete_mapping,
-)
-from app.domains.catalog.usecases.categories import (
+from app.domains.catalog.usecases.categories.query import (
+    list_categories as uc_list,
     list_mapped_categories as uc_list_mapped,
+)
+from app.domains.catalog.usecases.categories.command import (
+    update_category_mapping as uc_update_mapping,
+    delete_category_mapping as uc_delete_mapping,
 )
 
 router = APIRouter(

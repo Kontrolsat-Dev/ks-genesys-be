@@ -15,7 +15,7 @@ from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
 from app.models.product import Product
 from app.models.category import Category
-from app.domains.catalog.usecases.products import import_to_prestashop
+from app.domains.catalog.usecases.products.command import import_to_prestashop
 from app.domains.audit.services.audit_service import AuditService
 
 log = logging.getLogger(__name__)

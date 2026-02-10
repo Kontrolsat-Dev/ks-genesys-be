@@ -4,14 +4,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import require_access_token, get_prestashop_client
-from app.domains.prestashop.usecases.categories.list_categories import (
+from app.domains.prestashop.usecases.categories.query.list_categories import (
     execute as uc_list_ps_categories,
 )
-from app.domains.prestashop.usecases.brands.list_brands import execute as uc_list_brands
-from app.domains.prestashop.usecases.orders.list_orders_dropshipping import (
+from app.domains.prestashop.usecases.brands.query.list_brands import execute as uc_list_brands
+from app.domains.prestashop.usecases.orders.query.list_orders_dropshipping import (
     execute as uc_list_orders_dropshipping,
 )
-from app.domains.prestashop.usecases.orders.get_order import (
+from app.domains.prestashop.usecases.orders.query.get_order import (
     execute as uc_get_ps_order,
 )
 from app.external.prestashop_client import PrestashopClient

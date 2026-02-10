@@ -3,15 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy.orm import Session
-
-from app.repositories.catalog.read.product_read_repo import ProductReadRepository
-from app.repositories.catalog.write.product_active_offer_write_repo import (
-    ProductActiveOfferWriteRepository,
-)
-from app.repositories.procurement.read.supplier_item_read_repo import (
-    SupplierItemReadRepository,
-)
+from app.infra.uow import UoW
+from app.domains.catalog.services.price_service import compute_sale_price
+from app.models.category import Category
+from app.models.supplier import Supplier
 
 
 @dataclass
@@ -32,29 +27,17 @@ def _get(obj, key: str):
 
 
 def choose_active_offer_candidate(
-    db: Session,
+    uow: UoW,
     *,
     id_product: int,
 ) -> ActiveOfferCandidate | None:
     """
     Decide a melhor oferta para um produto com base nas SupplierItem.
-
-    Regras:
-    - se existirem ofertas com stock > 0:
-        → escolhe a melhor ENTRE essas (menor custo efetivo, depois maior stock,
-          depois menor id_supplier para desempatar)
-    - se NÃO existirem ofertas com stock > 0 mas existirem ofertas:
-        → escolhe a melhor oferta global (mesma ordenação), mesmo com stock = 0
-    - se não houver ofertas:
-        → devolve None
-
-    NOTA: custo efetivo = raw_price × (1 - supplier_discount)
     """
     if not id_product:
         return None
 
-    si_repo = SupplierItemReadRepository(db)
-    offers = si_repo.list_offers_for_product(id_product, only_in_stock=False)
+    offers = uow.supplier_items.list_offers_for_product(id_product, only_in_stock=False)
 
     best_any: ActiveOfferCandidate | None = None
     best_in_stock: ActiveOfferCandidate | None = None
@@ -120,25 +103,22 @@ def choose_active_offer_candidate(
 
 
 def recalculate_active_offer_for_product(
-    db: Session,
+    uow: UoW,
     *,
     id_product: int,
 ):
     """
     Recalcula a oferta ativa de um produto com base nas SupplierItem atuais.
-
-    - Se existir candidato → atualiza ProductActiveOffer com supplier/item/custo/stock/preço com margem.
-    - Se não existir nenhuma oferta → limpa supplier/item/preço e stock=0.
     """
-    pao_repo = ProductActiveOfferWriteRepository(db)
-    p_repo = ProductReadRepository(db)
+    product = uow.products.get(id_product)
+    if not product:
+        return None
 
-    margin = p_repo.get_product_margin(id_product)
-    best = choose_active_offer_candidate(db, id_product=id_product)
+    best = choose_active_offer_candidate(uow, id_product=id_product)
 
     # Sem qualquer oferta → limpamos a active_offer
     if best is None:
-        entity = pao_repo.upsert(
+        entity = uow.active_offers_w.upsert(
             id_product=id_product,
             id_supplier=None,
             id_supplier_item=None,
@@ -148,23 +128,30 @@ def recalculate_active_offer_for_product(
         )
         return entity
 
-    # Há oferta candidata → aplicar margin
+    # Há oferta candidata → aplicar margem + taxas
     unit_cost = best.unit_cost
     stock_sent = best.stock
     id_supplier = best.id_supplier
     id_supplier_item = best.id_supplier_item
 
-    unit_price_sent: float | None = None
-    try:
-        from app.domains.catalog.services.price_rounding import round_to_pretty_price
+    # Sessão direta necessária para models não gerenciados pelo UoW
+    # (ou poderíamos adicionar suppliers/categories ao UoW)
+    supplier = uow.db.get(Supplier, id_supplier) if id_supplier else None
+    category = (
+        uow.db.get(Category, product.id_category) if getattr(product, "id_category", None) else None
+    )
 
-        raw_price = unit_cost * (1 + margin)
-        unit_price_sent = round_to_pretty_price(raw_price)
-    except TypeError:
-        # margin devia vir sempre normalizada, mas se der porcaria: preço = custo
-        unit_price_sent = unit_cost
+    price_calc = compute_sale_price(
+        product=product,
+        category=category,
+        supplier_country=supplier.country if supplier else None,
+        cost=unit_cost,
+        supplier_discount=0,  # já aplicado em unit_cost
+    )
 
-    entity = pao_repo.upsert(
+    unit_price_sent: float | None = price_calc.sale_price if price_calc else None
+
+    entity = uow.active_offers_w.upsert(
         id_product=id_product,
         id_supplier=id_supplier,
         id_supplier_item=id_supplier_item,
@@ -177,23 +164,18 @@ def recalculate_active_offer_for_product(
 
 
 def recalculate_active_offers_for_supplier(
-    db: Session,
+    uow: UoW,
     *,
     id_supplier: int,
 ) -> int:
     """
     Recalcula a active_offer de todos os produtos que têm ofertas deste fornecedor.
-    Usado quando o desconto do fornecedor muda.
-
-    Returns:
-        Número de produtos atualizados.
     """
-    si_repo = SupplierItemReadRepository(db)
-    product_ids = si_repo.list_product_ids_for_supplier(id_supplier)
+    product_ids = uow.supplier_items.list_product_ids_for_supplier(id_supplier)
 
     updated = 0
     for id_product in product_ids:
-        recalculate_active_offer_for_product(db, id_product=id_product)
+        recalculate_active_offer_for_product(uow, id_product=id_product)
         updated += 1
 
     return updated

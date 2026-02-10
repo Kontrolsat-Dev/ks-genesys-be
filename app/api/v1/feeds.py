@@ -7,14 +7,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.deps import get_uow, require_access_token, get_feed_downloader
-from app.domains.procurement.usecases.feeds.delete_supplier_feed import (
+from app.domains.procurement.usecases.feeds.command.delete_supplier_feed import (
     execute as uc_delete,
 )
-from app.domains.procurement.usecases.feeds.get_by_supplier import (
+from app.domains.procurement.usecases.feeds.query.get_by_supplier import (
     execute as uc_get_feed_by_supplier,
 )
-from app.domains.procurement.usecases.feeds.test_feed import execute as uc_test
-from app.domains.procurement.usecases.feeds.upsert_supplier_feed import (
+from app.domains.procurement.usecases.feeds.command.test_feed import execute as uc_test
+from app.domains.procurement.usecases.feeds.command.upsert_supplier_feed import (
     execute as uc_upsert,
 )
 from app.external.feed_downloader import FeedDownloader

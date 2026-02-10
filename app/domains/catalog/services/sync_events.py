@@ -4,13 +4,9 @@ from __future__ import annotations
 from typing import Any
 from collections.abc import Mapping
 
-from sqlalchemy.orm import Session
-
+from app.infra.uow import UoW
 from app.models.product import Product
 from app.models.product_active_offer import ProductActiveOffer
-from app.repositories.catalog.write.catalog_update_stream_write_repo import (
-    CatalogUpdateStreamWriteRepository,
-)
 
 
 def _snapshot_active_offer(ao: ProductActiveOffer | None) -> dict[str, Any]:
@@ -35,7 +31,7 @@ def _snapshot_active_offer(ao: ProductActiveOffer | None) -> dict[str, Any]:
 
 
 def emit_product_state_event(
-    db: Session,
+    uow: UoW,
     *,
     product: Product,
     active_offer: ProductActiveOffer | None,
@@ -108,8 +104,7 @@ def emit_product_state_event(
             # preço alterou mas stock não teve transição crítica
             priority = priority_price_change
 
-    repo = CatalogUpdateStreamWriteRepository(db)
-    repo.enqueue_product_state_change(
+    uow.catalog_events_w.enqueue_product_state_change(
         product=product,
         active_offer=active_offer,
         reason=reason,

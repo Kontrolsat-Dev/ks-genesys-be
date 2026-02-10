@@ -153,6 +153,6 @@ class UoW:
     def __enter__(self) -> UoW:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
-        if exc or not self._committed:
+    def __exit__(self, _exc_type, _exc, _tb) -> None:
+        if _exc_type or not self._committed:
             self.rollback()

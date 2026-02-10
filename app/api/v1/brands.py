@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, Depends
 from app.infra.uow import UoW
 from app.core.deps import get_uow, require_access_token
 from app.schemas.brands import BrandListOut
-from app.domains.catalog.usecases.brands.list_brands import execute as uc_list
+from app.domains.catalog.usecases.brands.query.list_brands import execute as uc_list
 
 
 router = APIRouter(

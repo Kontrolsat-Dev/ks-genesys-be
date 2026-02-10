@@ -34,8 +34,11 @@ class ProductOut(BaseModel):
     partnumber: str | None = None
     name: str | None = None
     margin: float | None = None
-    ecotax: float = 0
-    extra_fees: float = 0
+    # Taxas adicionais (null = herda da categoria)
+    ecotax: float | None = None
+    extra_fees: float | None = None
+    category_ecotax: float | None = None
+    category_extra_fees: float | None = None
     description: str | None = None
     image_url: str | None = None
     weight_str: str | None = None

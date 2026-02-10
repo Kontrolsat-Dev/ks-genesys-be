@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import BadRequest, InvalidArgument, NotFound
@@ -20,14 +21,17 @@ from app.domains.audit.services.audit_service import AuditService
 
 log = logging.getLogger(__name__)
 
+# Sentinel para distinguir entre "omitido" e "enviado como null"
+_UNSET: Any = object()
+
 
 def execute(
     uow: UoW,
     *,
     id_product: int,
     margin: float,
-    ecotax: float | None = None,
-    extra_fees: float | None = None,
+    ecotax: float | None = _UNSET,
+    extra_fees: float | None = _UNSET,
     expand_meta: bool = True,
     expand_offers: bool = True,
     expand_events: bool = True,
@@ -80,21 +84,21 @@ def execute(
         # Aplicar a nova margem
         uow.products_w.set_margin(id_product=id_product, margin=new_margin)
 
-        # Atualizar taxas se fornecidas
-        if ecotax is not None:
+        # Atualizar taxas se explicitamente fornecidas (permite NULL para herança)
+        if ecotax is not _UNSET:
             product.ecotax = ecotax
-        if extra_fees is not None:
+        if extra_fees is not _UNSET:
             product.extra_fees = extra_fees
 
         # Só faz sentido recalcular/emitir se estiver ligado ao PrestaShop
         if product.id_ecommerce and product.id_ecommerce > 0:
             new_active = recalculate_active_offer_for_product(
-                uow.db,
+                uow,
                 id_product=id_product,
             )
 
             emit_product_state_event(
-                uow.db,
+                uow,
                 product=product,
                 active_offer=new_active,
                 reason="margin_update",

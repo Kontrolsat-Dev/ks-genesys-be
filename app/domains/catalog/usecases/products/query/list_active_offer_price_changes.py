@@ -41,10 +41,8 @@ def execute(
     now = datetime.utcnow()
     since = now - timedelta(days=days)
 
-    min_abs_dec = Decimal(
-        str(min_abs_delta)) if min_abs_delta is not None else None
-    min_pct_dec = Decimal(
-        str(min_pct_delta)) if min_pct_delta is not None else None
+    min_abs_dec = Decimal(str(min_abs_delta)) if min_abs_delta is not None else None
+    min_pct_dec = Decimal(str(min_pct_delta)) if min_pct_delta is not None else None
 
     changes: list[ProductPriceChangeOut] = []
 
@@ -96,8 +94,7 @@ def execute(
             continue
 
         if old_price != 0:
-            delta_pct = (delta_abs / old_price * Decimal("100")
-                         ).quantize(Decimal("0.01"))
+            delta_pct = (delta_abs / old_price * Decimal("100")).quantize(Decimal("0.01"))
         else:
             delta_pct = Decimal("0.00")
 

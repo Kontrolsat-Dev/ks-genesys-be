@@ -8,14 +8,14 @@ from fastapi import APIRouter, Depends, Path
 
 from app.core.deps import get_uow, require_access_token
 from app.domains.mapping.engine import supported_ops_for_api
-from app.domains.procurement.usecases.mappers.get_by_supplier import (
+from app.domains.procurement.usecases.mappers.query.get_by_supplier import (
     execute as uc_q_mapper_by_supplier,
 )
-from app.domains.procurement.usecases.mappers.get_mapper import execute as uc_get_mapper
-from app.domains.procurement.usecases.mappers.validate_mapper import (
+from app.domains.procurement.usecases.mappers.query.get_mapper import execute as uc_get_mapper
+from app.domains.procurement.usecases.mappers.command.validate_mapper import (
     execute as uc_validate,
 )
-from app.domains.procurement.usecases.mappers.put_mapper import execute as uc_put_mapper
+from app.domains.procurement.usecases.mappers.command.put_mapper import execute as uc_put_mapper
 from app.infra.uow import UoW
 from app.schemas.mappers import (
     MapperValidateIn,

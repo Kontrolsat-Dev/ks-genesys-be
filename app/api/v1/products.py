@@ -5,29 +5,31 @@ from fastapi import APIRouter, Depends, Query, Path
 from typing import Annotated, Literal
 
 from app.core.deps import get_uow, require_access_token
-from app.domains.catalog.usecases.products.get_product_by_gtin import (
+from app.domains.catalog.usecases.products.query.get_product_by_gtin import (
     execute as uc_q_product_detail_by_gtin,
 )
-from app.domains.catalog.usecases.products.get_product_detail import (
+from app.domains.catalog.usecases.products.query.get_product_detail import (
     execute as uc_q_product_detail,
 )
-from app.domains.catalog.usecases.products.list_products import (
+from app.domains.catalog.usecases.products.query.list_products import (
     execute as uc_q_list_products,
 )
-from app.domains.catalog.usecases.products.update_margin import (
+from app.domains.catalog.usecases.products.command.update_margin import (
     execute as uc_update_product_margin,
 )
-from app.domains.catalog.usecases.products.list_active_offer_price_changes import (
+from app.domains.catalog.usecases.products.query.list_active_offer_price_changes import (
     execute as uc_list_active_offer_price_changes,
 )
-from app.domains.catalog.usecases.products.list_catalog_price_changes import (
+from app.domains.catalog.usecases.products.query.list_catalog_price_changes import (
     execute as uc_list_catalog_price_changes,
 )
-from app.domains.catalog.usecases.products.get_product_facets import (
+from app.domains.catalog.usecases.products.query.get_product_facets import (
     execute as uc_get_product_facets,
 )
-from app.domains.catalog.usecases.products.import_to_prestashop import execute as uc_import_product
-from app.domains.catalog.usecases.products import bulk_import as uc_bulk_import
+from app.domains.catalog.usecases.products.command.import_to_prestashop import (
+    execute as uc_import_product,
+)
+from app.domains.catalog.usecases.products.command import bulk_import as uc_bulk_import
 from app.infra.uow import UoW
 from app.schemas.products import (
     ProductDetailOut,
@@ -270,9 +272,7 @@ def update_product_margin(
     return uc_update_product_margin(
         uow,
         id_product=id_product,
-        margin=payload.margin,
-        ecotax=payload.ecotax,
-        extra_fees=payload.extra_fees,
+        **payload.model_dump(exclude_unset=True),
         expand_meta=expand_meta,
         expand_offers=expand_offers,
         expand_events=expand_events,

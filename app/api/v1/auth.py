@@ -7,8 +7,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.core.deps import require_access_token, get_prestashop_client, get_uow
-from app.domains.auth.usecases.login import execute as uc_login
-from app.domains.auth.usecases.refresh_tokens import execute as uc_refresh
+from app.domains.auth.usecases.command.login import execute as uc_login
+from app.domains.auth.usecases.command.refresh_tokens import execute as uc_refresh
 from app.external.prestashop_client import PrestashopClient
 from app.infra.uow import UoW
 from app.schemas.auth import LoginRequest, LoginResponse, RefreshRequest, RefreshResponse

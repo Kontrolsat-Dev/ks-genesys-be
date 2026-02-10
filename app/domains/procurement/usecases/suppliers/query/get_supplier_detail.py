@@ -60,8 +60,7 @@ def _mapper_to_out(m) -> FeedMapperOut | None:
     if not m:
         return None
     try:
-        profile = json.loads(m.profile_json) if getattr(
-            m, "profile_json", None) else {}
+        profile = json.loads(m.profile_json) if getattr(m, "profile_json", None) else {}
     except Exception:
         profile = {}
     return FeedMapperOut(

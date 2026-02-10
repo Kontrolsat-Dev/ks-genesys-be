@@ -60,8 +60,7 @@ def execute(
 
     # 2) Opcionalmente expandir ofertas via repositório de supplier items
     if expand_offers:
-        offers_raw = uow.supplier_items.list_offers_for_product_ids(
-            ids, only_in_stock=False)
+        offers_raw = uow.supplier_items.list_offers_for_product_ids(ids, only_in_stock=False)
         for o in offers_raw:
             offer: OfferOut = map_offer_row_to_out(o)
             items_map[o["id_product"]].offers.append(offer)
@@ -70,8 +69,7 @@ def execute(
     from app.domains.catalog.services.best_offer_service import find_best_offer_from_schemas
 
     for po in items_map.values():
-        po.best_offer = find_best_offer_from_schemas(
-            po.offers, require_stock=True)
+        po.best_offer = find_best_offer_from_schemas(po.offers, require_stock=True)
 
     # 4) active_offer = oferta ativa/comunicada (ProductActiveOffer)
     active_map = uow.active_offers.list_for_products(ids)
