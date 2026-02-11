@@ -13,7 +13,7 @@ from app.core.normalize import (
     to_decimal_str,
     normalize_category,
 )
-from app.domains.mapping.engine import IngestEngine
+from app.domains.mapping.services.engine import IngestEngine
 from app.infra.uow import UoW
 
 log = logging.getLogger(__name__)

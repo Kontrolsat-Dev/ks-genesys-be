@@ -10,6 +10,9 @@ from app.domains.catalog.services.mappers import (
     map_active_offer_from_pao_to_out,
 )
 from app.infra.uow import UoW
+from .series import aggregate_daily_points
+from app.domains.catalog.services.best_offer_service import find_best_offer_from_schemas
+from app.domains.catalog.services.price_service import PriceService
 from app.schemas.products import (
     ProductOut,
     ProductMetaOut,
@@ -18,8 +21,8 @@ from app.schemas.products import (
     ProductDetailOut,
     ProductStatsOut,
     SeriesPointOut,
+    PriceBreakdown,
 )
-from .series import aggregate_daily_points
 
 
 @dataclass(frozen=True)
@@ -68,8 +71,6 @@ def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> Pro
                 suppliers_set.add(int(o["id_supplier"]))
 
     # 3.1) best_offer = melhor oferta COM STOCK (menor preço - já com desconto)
-    from app.domains.catalog.services.best_offer_service import find_best_offer_from_schemas
-
     best = find_best_offer_from_schemas(offers, require_stock=True)
 
     # 3.2) active_offer = oferta ativa/comunicada (ProductActiveOffer)
@@ -78,6 +79,41 @@ def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> Pro
         pao = uow.active_offers.get_by_product(p.id)
         if pao and pao.id_supplier is not None:
             active_offer = map_active_offer_from_pao_to_out(pao)
+
+    # 3.3) Calcular Price Breakdown usando a melhor oferta disponível
+    # Se houver active_offer, usamos essa (já foi calculada e enviada).
+    # Se não, usamos a best_offer para simular quanto ficaria.
+    price_breakdown = None
+    reference_offer = active_offer or best
+
+    if reference_offer and reference_offer.price:
+        try:
+            # 1. Fetch Category (necessário para margem e taxas default)
+            cat_obj = None
+            if p.id_category:
+                cat_obj = uow.categories.get(p.id_category)
+
+            # 2. Obter supplier (opcional, para isenção PT)
+            # Para visualização rápida, podemos ignorar e assumir "pior caso" (com taxa)
+            # ou tentar obter se reference_offer tiver id_supplier.
+            # Vamos ignorar para performance de leitura.
+
+            # 3. Resolução Centralizada
+            params = PriceService.resolve_pricing_params(product=p, category=cat_obj, supplier=None)
+
+            # 4. Calcular Breakdown
+            cost = float(reference_offer.price)
+            pb_dict = PriceService.calculate_price_breakdown(
+                cost=cost,
+                margin=params["margin"],
+                ecotax=params["ecotax"],
+                extra_fees=params["extra_fees"],
+            )
+            price_breakdown = PriceBreakdown(**pb_dict)
+
+        except Exception:
+            # Se falhar calculo (ex: dados sujos), segue sem breakdown
+            pass
 
     # 4) eventos + séries
     events_out: list[ProductEventOut] | None = None
@@ -130,4 +166,5 @@ def get_product_detail(uow: UoW, *, id_product: int, opts: DetailOptions) -> Pro
         stats=stats,
         events=events_out,
         series_daily=series_daily,
+        price_breakdown=price_breakdown,
     )

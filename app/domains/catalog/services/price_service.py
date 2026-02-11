@@ -1,105 +1,157 @@
 # app/domains/catalog/services/price_service.py
-"""
-Serviço centralizado para cálculo de preço de venda (manual ou worker).
-
-Formula base:
-    preco_venda = (custo_liquido × (1 + margem)) + ecotax + extra_fees
-
-- custo_liquido = custo_bruto × (1 - supplier_discount)
-- ecotax só é aplicada se o fornecedor NÃO for PT; extra_fees aplicam sempre.
-- O arredondamento final segue a regra .40/.90 com IVA via round_to_pretty_price.
-
-Retorna sempre um breakdown com os componentes usados para facilitar debug.
-"""
-
 from __future__ import annotations
 
-from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from typing import Any
+from decimal import Decimal
 
-from app.domains.catalog.services.price_rounding import round_to_pretty_price
+from app.domains.config.services.config_service import config_service
 
 
-@dataclass
-class PriceBreakdown:
-    sale_price: float
-    raw_sale_price: float
-    discounted_cost: float
-    margin: float
-    ecotax: float
-    extra_fees: float
+class PriceService:
+    @staticmethod
+    def get_vat_rate() -> Decimal:
+        """Obtém a taxa de IVA da configuração."""
+        return Decimal(str(config_service.get_float("vat_rate", default=1.23)))
 
+    @staticmethod
+    def calculate_effective_cost(price: float | Decimal, discount: float | Decimal) -> Decimal:
+        """
+        Calcula o custo efetivo: price * (1 - discount).
+        """
+        p = Decimal(str(price))
+        d = Decimal(str(discount or 0))
+        return p * (1 - d)
 
-def _to_decimal(value: Any, default: str = "0") -> Decimal:
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, TypeError, ValueError):
-        return Decimal(default)
+    @staticmethod
+    def calculate_price_breakdown(
+        cost: float | Decimal,
+        margin: float | Decimal,
+        ecotax: float | Decimal = 0,
+        extra_fees: float | Decimal = 0,
+        vat_rate: Decimal | None = None,
+    ) -> dict:
+        """
+        Calcula o preço final e todos os passos intermédios.
 
+        Regra:
+        1. Base = Custo * (1 + Margem)
+        2. Bruto sem IVA = Base + Ecotax + Extra Fees
+        3. Bruto com IVA = Bruto sem IVA * IVA
+        4. Arredondamento = (Bruto com IVA) -> .40 ou .90
+        5. Final sem IVA = Arredondado / IVA
+        """
+        cost_d = Decimal(str(cost))
+        margin_d = Decimal(str(margin))
+        ecotax_d = Decimal(str(ecotax or 0))
+        extra_fees_d = Decimal(str(extra_fees or 0))
 
-def compute_sale_price(
-    *,
-    product,
-    category=None,
-    supplier_country: str | None,
-    cost: Any,
-    supplier_discount: Any = 0,
-) -> PriceBreakdown | None:
-    """
-    Calcula o preço de venda para PrestaShop (ou active_offer) aplicando
-    margem, ecotax e extra_fees de forma consistente para API e worker.
+        if vat_rate is None:
+            vat_rate = PriceService.get_vat_rate()
 
-    Args:
-        product: entidade Product (precisa de margin/ecotax/extra_fees/id_category)
-        category: entidade Category opcional (para defaults de ecotax/extra_fees)
-        supplier_country: país do fornecedor (para regra da ecotax)
-        cost: custo bruto recebido do supplier_item
-        supplier_discount: desconto percentagem (0.05 = 5%)
-    """
+        # 1. Base (Custo + Margem)
+        base_price = cost_d * (1 + margin_d)
 
-    cost_dec = _to_decimal(cost, default="-1")
-    if cost_dec <= 0:
-        return None
+        # 2. Bruto sem IVA (Soma taxas)
+        # NOTA: Margem não incide sobre ecotax nem extra_fees (são pass-through)
+        gross_price_no_vat = base_price + ecotax_d + extra_fees_d
 
-    discount_dec = _to_decimal(supplier_discount)
-    discounted_cost = cost_dec * (1 - discount_dec)
+        # 3. Bruto com IVA
+        gross_price_vat = gross_price_no_vat * vat_rate
 
-    margin_dec = _to_decimal(getattr(product, "margin", 0))
+        # 4. Arredondamento
+        final_price_vat = PriceService._round_to_40_or_90(gross_price_vat)
 
-    # Ecotax depende do país do fornecedor; extra_fees aplica SEMPRE
-    is_pt = (supplier_country or "").upper() == "PT"
+        # 5. Final sem IVA (Valor a enviar para o PrestaShop)
+        final_price_no_vat = final_price_vat / vat_rate
 
-    # Herança: se product.ecotax for None -> usa default da categoria (permite override para 0)
-    p_ecotax = getattr(product, "ecotax", None)
-    if p_ecotax is None and category is not None:
-        ecotax_val = _to_decimal(getattr(category, "default_ecotax", 0))
-    else:
-        ecotax_val = _to_decimal(p_ecotax)
+        return {
+            "cost": float(cost_d),
+            "margin_pct": float(margin_d),
+            "margin_value": float(cost_d * margin_d),
+            "ecotax": float(ecotax_d),
+            "extra_fees": float(extra_fees_d),
+            "vat_rate": float(vat_rate),
+            "base_price": float(base_price.quantize(Decimal("0.01"))),
+            "gross_price_no_vat": float(gross_price_no_vat.quantize(Decimal("0.01"))),
+            "gross_price_vat": float(gross_price_vat.quantize(Decimal("0.01"))),
+            "final_price_vat": float(final_price_vat),
+            # Mais precisão para o PS
+            "final_price_no_vat": float(final_price_no_vat.quantize(Decimal("0.000001"))),
+        }
 
-    if is_pt:
-        ecotax_val = Decimal("0")
+    @staticmethod
+    def _round_to_40_or_90(price_with_vat: Decimal) -> Decimal:
+        """
+        Arredonda preço com IVA para o .40 ou .90 mais próximo.
+        """
+        euros = int(price_with_vat)
+        cents = price_with_vat - euros
 
-    # Herança: se product.extra_fees for None -> usa default da categoria (permite override para 0)
-    p_extra_fees = getattr(product, "extra_fees", None)
-    if p_extra_fees is None and category is not None:
-        extra_fees_val = _to_decimal(getattr(category, "default_extra_fees", 0))
-    else:
-        extra_fees_val = _to_decimal(p_extra_fees)
-    # extra_fees nunca é removido para PT
+        if cents <= Decimal("0.15"):
+            # Mais perto do .90 do euro anterior
+            if euros > 0:
+                return Decimal(f"{euros - 1}.90")
+            else:
+                return Decimal("0.40")
+        elif cents <= Decimal("0.65"):
+            # Mais perto de .40
+            return Decimal(f"{euros}.40")
+        else:
+            # Mais perto de .90
+            return Decimal(f"{euros}.90")
 
-    raw_sale_price = discounted_cost * (1 + margin_dec) + ecotax_val + extra_fees_val
+    @staticmethod
+    def resolve_pricing_params(product, category=None, supplier=None) -> dict[str, float]:
+        """
+        Centraliza a lógica de decisão de preços/taxas (Herança e Isenções).
 
-    sale_price = round_to_pretty_price(float(raw_sale_price))
+        Regras:
+        1. Margem: Produto > Categoria > 0
+        2. Ecotax: (Se fornecedor PT -> 0) SENÃO (Produto > Categoria > 0)
+        3. Extra Fees: Produto > Categoria > 0
+        """
 
-    # Quantizar para 2 casas para payloads/armazenamento previsíveis
-    sale_price_q = float(_to_decimal(sale_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+        # 1. Margem
+        margin = 0.0
+        if product.margin is not None and product.margin > 0:
+            margin = float(product.margin)
+        elif category and getattr(category, "margin", None) is not None:
+            # Nota: Category pode vir como dict ou object, ou ter campo 'margin' diferente.
+            # Assumimos object standard. Se for dict, tratar caller.
+            try:
+                margin = float(category.margin)
+            except (TypeError, ValueError):
+                margin = 0.0
 
-    return PriceBreakdown(
-        sale_price=sale_price_q,
-        raw_sale_price=float(raw_sale_price),
-        discounted_cost=float(discounted_cost),
-        margin=float(margin_dec),
-        ecotax=float(ecotax_val),
-        extra_fees=float(extra_fees_val),
-    )
+        # 2. Ecotax
+        ecotax = 0.0
+        # Isenção fornecedor PT
+        supplier_country = getattr(supplier, "country", "") or ""
+        if supplier_country.strip().upper() == "PT":
+            ecotax = 0.0
+        else:
+            # Herança
+            if product.ecotax is not None:
+                ecotax = float(product.ecotax)
+            elif category:
+                # Tenta 'default_ecotax' (nome na DB) ou 'category_ecotax' (nome no join)
+                cat_eco = getattr(category, "default_ecotax", None)
+                # Se category for dict vindo de read model
+                if cat_eco is None and isinstance(category, dict):
+                    cat_eco = category.get("default_ecotax")
+
+                if cat_eco is not None:
+                    ecotax = float(cat_eco)
+
+        # 3. Extra Fees
+        extra_fees = 0.0
+        if product.extra_fees is not None:
+            extra_fees = float(product.extra_fees)
+        elif category:
+            cat_fees = getattr(category, "default_extra_fees", None)
+            if cat_fees is None and isinstance(category, dict):
+                cat_fees = category.get("default_extra_fees")
+
+            if cat_fees is not None:
+                extra_fees = float(cat_fees)
+
+        return {"margin": margin, "ecotax": ecotax, "extra_fees": extra_fees}

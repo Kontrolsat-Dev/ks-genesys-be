@@ -27,7 +27,7 @@ def post_login(
     Autenticação de utilizador.
     Retorna access_token (curta duração) e refresh_token (longa duração).
     """
-    return uc_login(body, auth_login=client.login, db=uow.db)
+    return uc_login(body, auth_login=client.login, uow=uow)
 
 
 @router.post("/refresh", response_model=RefreshResponse, summary="Renovar tokens")

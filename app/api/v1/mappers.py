@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path
 
 from app.core.deps import get_uow, require_access_token
-from app.domains.mapping.engine import supported_ops_for_api
+from app.domains.mapping.services.engine import supported_ops_for_api
 from app.domains.procurement.usecases.mappers.query.get_by_supplier import (
     execute as uc_q_mapper_by_supplier,
 )

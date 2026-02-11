@@ -98,6 +98,20 @@ class ProductStatsOut(BaseModel):
     last_change_at: datetime | None = None
 
 
+class PriceBreakdown(BaseModel):
+    cost: float
+    margin_pct: float
+    margin_value: float
+    ecotax: float
+    extra_fees: float
+    vat_rate: float
+    base_price: float
+    gross_price_no_vat: float
+    gross_price_vat: float
+    final_price_vat: float
+    final_price_no_vat: float
+
+
 class ProductDetailOut(BaseModel):
     """
     Detalhe completo de produto:
@@ -113,6 +127,7 @@ class ProductDetailOut(BaseModel):
     stats: ProductStatsOut
     events: list[ProductEventOut] | None = None
     series_daily: list[SeriesPointOut] | None = None
+    price_breakdown: PriceBreakdown | None = None
 
 
 # --------------------------

@@ -15,7 +15,7 @@ def ensure_recurring_jobs(session_factory) -> dict[str, int]:
     """
     from app.infra.uow import UoW
     from app.infra.base import utcnow
-    from app.domains.worker.usecases.schedule_supplier_ingest_jobs import (
+    from app.domains.worker.usecases.command.schedule_supplier_ingest_jobs import (
         schedule_supplier_ingest_jobs,
     )
     from app.repositories.worker.write.worker_job_write_repo import (

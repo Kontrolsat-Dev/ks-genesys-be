@@ -1,4 +1,4 @@
-# app/api/v1/categories.py
+# app/api/v1/sage.py
 # Endpoints para interagir com ERP SAGE 50c Loja
 
 from __future__ import annotations

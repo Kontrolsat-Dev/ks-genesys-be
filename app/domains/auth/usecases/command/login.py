@@ -8,13 +8,12 @@ from __future__ import annotations
 from typing import Any
 from collections.abc import Callable
 
-from sqlalchemy.orm import Session
-
 from app.core.config import settings
 from app.core.errors import Unauthorized
 from app.schemas.auth import LoginRequest, LoginResponse
 from app.shared.jwt import create_access_token, create_refresh_token
 from app.domains.audit.services.audit_service import AuditService
+from app.infra.uow import UoW
 
 AuthFn = Callable[[str, str], dict[str, Any]]
 
@@ -23,16 +22,16 @@ def execute(
     req: LoginRequest,
     *,
     auth_login: AuthFn,
-    db: Session | None = None,
+    uow: UoW | None = None,
 ) -> LoginResponse:
     """
-    Authenticate via injected auth function and issue JWT tokens.
-    Returns both access_token (short-lived) and refresh_token (long-lived).
+    Autentica via função injetada e emite tokens JWT.
+    Retorna access_token (curta duração) e refresh_token (longa duração).
 
-    Args:
-        req: Login request with email and password
-        auth_login: Function to authenticate (injected, typically PS client)
-        db: Optional DB session for audit logging
+    Argumentos:
+        req: Pedido de login com email e password
+        auth_login: Função de autenticação (injetada, tipicamente cliente PS)
+        uow: Unit of Work opcional para registo de audit logs
     """
     try:
         user = auth_login(req.email, req.password)
@@ -51,14 +50,14 @@ def execute(
     expires_in = settings.JWT_EXPIRE_MIN * 60
     refresh_expires_in = settings.JWT_REFRESH_EXPIRE_MIN * 60
 
-    # Audit log (se db disponível)
-    if db is not None:
-        AuditService(db).log_user_login(
+    # Audit log (se uow disponível)
+    if uow is not None:
+        AuditService(uow.db).log_user_login(
             user_id=user_id,
             user_name=name,
             email=email,
         )
-        db.commit()
+        uow.commit()
 
     return LoginResponse(
         access_token=access,

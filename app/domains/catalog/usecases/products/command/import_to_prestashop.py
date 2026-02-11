@@ -5,15 +5,16 @@ UseCase para importar um produto para o PrestaShop.
 
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP
+
+from decimal import Decimal
 
 from app.infra.uow import UoW
 from app.external.prestashop_client import PrestashopClient
 from app.core.errors import NotFound, InvalidArgument
 from app.domains.catalog.services.best_offer_service import find_best_offer_from_dicts
-from app.domains.catalog.services.price_service import compute_sale_price
 from app.domains.audit.services.audit_service import AuditService
 from app.schemas.products import ProductImportOut
+from app.domains.catalog.services.price_service import PriceService
 
 
 def execute(
@@ -64,12 +65,9 @@ def execute(
     # Obter categoria para herança de taxas default
     category = uow.categories.get(product.id_category) if product.id_category else None
 
-    supplier_country: str | None = None
     supplier = None
     if best_offer and best_offer.get("id_supplier"):
         supplier = uow.suppliers.get(best_offer["id_supplier"])
-        if supplier:
-            supplier_country = supplier.country
 
     # Calcular preço via serviço centralizado (aplica margens, ecotax, extra_fees)
     price_str: str | None = None
@@ -79,19 +77,32 @@ def execute(
 
     if best_offer:
         stock = best_offer.get("stock") or 0
-        raw_cost = Decimal(str(best_offer.get("price"))) if best_offer.get("price") else None
-        calc = compute_sale_price(
-            product=product,
-            category=category,
-            supplier_country=supplier_country,
-            cost=best_offer.get("price"),
-            supplier_discount=best_offer.get("supplier_discount"),
-        )
-        if calc:
-            price_str = str(
-                Decimal(str(calc.sale_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Calcular custo com desconto
+        try:
+            raw_cost = PriceService.calculate_effective_cost(
+                best_offer.get("price"), best_offer.get("supplier_discount")
             )
-            ecotax_used = calc.ecotax
+        except (TypeError, ValueError):
+            raw_cost = None
+
+        if raw_cost is not None:
+            # Centralized resolution
+            params = PriceService.resolve_pricing_params(
+                product=product, category=category, supplier=supplier
+            )
+
+            # 3. Calcular
+            pb = PriceService.calculate_price_breakdown(
+                cost=raw_cost,
+                margin=params["margin"],
+                ecotax=params["ecotax"],
+                extra_fees=params["extra_fees"],
+            )
+
+            # O PrestaShop espera o preço SEM IVA. O PriceService já devolve isso em final_price_no_vat.
+            price_str = str(pb["final_price_no_vat"])
+            ecotax_used = pb["ecotax"]
 
     # Construir payload para PrestaShop
     payload = {

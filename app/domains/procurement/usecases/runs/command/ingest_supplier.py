@@ -7,7 +7,7 @@ from contextlib import suppress
 from typing import Any
 
 from app.core.errors import NotFound
-from app.domains.mapping.engine import IngestEngine
+from app.domains.mapping.services.engine import IngestEngine
 from app.domains.procurement.services import (
     FeedHttpError,
     load_feed_rows,

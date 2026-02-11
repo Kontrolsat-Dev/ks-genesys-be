@@ -9,9 +9,11 @@ from typing import Any
 from app.core.deps import get_uow, require_access_token
 from app.infra.uow import UoW
 from app.schemas.worker_jobs import WorkerJobListOut
-from app.domains.worker.usecases.query import list_worker_jobs as uc_list_worker_jobs
-from app.domains.worker.usecases.command import (
-    schedule_supplier_ingest_jobs as uc_schedule_supplier_ingest_jobs,
+from app.domains.worker.usecases.query.list_worker_jobs import (
+    execute as uc_list_worker_jobs,
+)
+from app.domains.worker.usecases.command.schedule_supplier_ingest_jobs import (
+    execute as uc_schedule_supplier_ingest_jobs,
 )
 
 router = APIRouter(

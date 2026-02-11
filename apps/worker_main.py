@@ -15,7 +15,7 @@ from app.background.job_handlers import (
     dispatch_job,
 )
 from app.core.logging import setup_logging
-from app.domains.worker.usecases.schedule_supplier_ingest_jobs import (
+from app.domains.worker.usecases.command.schedule_supplier_ingest_jobs import (
     schedule_supplier_ingest_jobs,
 )
 from app.infra.session import SessionLocal

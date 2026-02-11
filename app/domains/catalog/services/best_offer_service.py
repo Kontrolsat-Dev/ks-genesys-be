@@ -32,12 +32,14 @@ def find_best_offer_from_dicts(
     if not offers:
         return None
 
+    from app.domains.catalog.services.price_service import PriceService
+
     def effective_cost(o: dict) -> Decimal:
         """Calcula preço × (1 - desconto) usando supplier_discount do dict."""
         try:
-            price = Decimal(str(o["price"]))
-            discount = Decimal(str(o.get("supplier_discount") or 0))
-            return price * (1 - discount)
+            return PriceService.calculate_effective_cost(
+                o["price"], o.get("supplier_discount") or 0
+            )
         except (TypeError, ValueError, KeyError):
             return Decimal("999999")
 

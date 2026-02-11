@@ -4,9 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.infra.uow import UoW
-from app.domains.catalog.services.price_service import compute_sale_price
 from app.models.category import Category
 from app.models.supplier import Supplier
+from app.domains.catalog.services.price_service import PriceService
 
 
 @dataclass
@@ -141,15 +141,19 @@ def recalculate_active_offer_for_product(
         uow.db.get(Category, product.id_category) if getattr(product, "id_category", None) else None
     )
 
-    price_calc = compute_sale_price(
-        product=product,
-        category=category,
-        supplier_country=supplier.country if supplier else None,
-        cost=unit_cost,
-        supplier_discount=0,  # já aplicado em unit_cost
+    # Centralized resolution
+    params = PriceService.resolve_pricing_params(
+        product=product, category=category, supplier=supplier
     )
 
-    unit_price_sent: float | None = price_calc.sale_price if price_calc else None
+    pb = PriceService.calculate_price_breakdown(
+        cost=unit_cost,
+        margin=params["margin"],
+        ecotax=params["ecotax"],
+        extra_fees=params["extra_fees"],
+    )
+
+    unit_price_sent: float | None = pb["final_price_no_vat"]
 
     entity = uow.active_offers_w.upsert(
         id_product=id_product,
