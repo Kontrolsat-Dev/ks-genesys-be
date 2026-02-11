@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 from app.repositories.orders_dropshipping.write.dropshipping_order_write_repo import (
     DropshippingOrderWriteRepository,
     DropshippingOrderLineWriteRepository,
@@ -65,75 +66,192 @@ class UoW:
     def __init__(self, db_session: Session) -> None:
         self._db = db_session
         self._committed = False
+        self._repos = {}
 
-        # ═══════════════════════════════════════════════
-        # CATALOG - READ
-        # ═══════════════════════════════════════════════
-        self.products = ProductReadRepository(db_session)
-        self.brands = BrandReadRepository(db_session)
-        self.categories = CategoryReadRepository(db_session)
-        self.product_meta = ProductMetaReadRepository(db_session)
-        self.active_offers = ProductActiveOfferReadRepository(db_session)
-        self.catalog_events = CatalogUpdateStreamReadRepository(db_session)
+    def _get_repo(self, name: str, repo_class: Any) -> Any:
+        if name not in self._repos:
+            self._repos[name] = repo_class(self._db)
+        return self._repos[name]
 
-        # ═══════════════════════════════════════════════
-        # CATALOG - WRITE
-        # ═══════════════════════════════════════════════
-        self.products_w = ProductWriteRepository(db_session)
-        self.brands_w = BrandWriteRepository(db_session)
-        self.categories_w = CategoryWriteRepository(db_session)
-        self.active_offers_w = ProductActiveOfferWriteRepository(db_session)
-        self.catalog_events_w = CatalogUpdateStreamWriteRepository(db_session)
+    # ═══════════════════════════════════════════════
+    # CATALOG - READ
+    # ═══════════════════════════════════════════════
 
-        # ═══════════════════════════════════════════════
-        # PROCUREMENT - READ
-        # ═══════════════════════════════════════════════
-        self.suppliers = SupplierReadRepository(db_session)
-        self.feeds = SupplierFeedReadRepository(db_session)
-        self.feed_runs = FeedRunReadRepository(db_session)
-        self.mappers = MapperReadRepository(db_session)
-        self.supplier_items = SupplierItemReadRepository(db_session)
-        self.product_events = ProductEventReadRepository(db_session)
+    @property
+    def products(self) -> ProductReadRepository:
+        return self._get_repo("products", ProductReadRepository)
 
-        # ═══════════════════════════════════════════════
-        # PROCUREMENT - WRITE
-        # ═══════════════════════════════════════════════
-        self.suppliers_w = SupplierWriteRepository(db_session)
-        self.feeds_w = SupplierFeedWriteRepository(db_session)
-        self.feed_runs_w = FeedRunWriteRepository(db_session)
-        self.mappers_w = MapperWriteRepository(db_session)
-        self.supplier_items_w = SupplierItemWriteRepository(db_session)
-        self.product_events_w = ProductEventWriteRepository(db_session)
+    @property
+    def brands(self) -> BrandReadRepository:
+        return self._get_repo("brands", BrandReadRepository)
 
-        # ═══════════════════════════════════════════════
-        # WORKER - READ/WRITE
-        # ═══════════════════════════════════════════════
-        self.worker_jobs = WorkerJobReadRepository(db_session)
-        self.worker_jobs_w = WorkerJobWriteRepository(db_session)
-        self.worker_activity = WorkerActivityReadRepository(db_session)
-        self.worker_activity_w = WorkerActivityWriteRepository(db_session)
+    @property
+    def categories(self) -> CategoryReadRepository:
+        return self._get_repo("categories", CategoryReadRepository)
 
-        # ═══════════════════════════════════════════════
-        # AUDIT - READ/WRITE
-        # ═══════════════════════════════════════════════
-        self.audit_logs = AuditLogReadRepository(db_session)
-        self.audit_logs_w = AuditLogWriteRepository(db_session)
+    @property
+    def product_meta(self) -> ProductMetaReadRepository:
+        return self._get_repo("product_meta", ProductMetaReadRepository)
 
-        # ═══════════════════════════════════════════════
-        # CONFIG - READ/WRITE
-        # ═══════════════════════════════════════════════
-        self.platform_config = PlatformConfigReadRepository(db_session)
-        self.platform_config_w = PlatformConfigWriteRepository(db_session)
+    @property
+    def active_offers(self) -> ProductActiveOfferReadRepository:
+        return self._get_repo("active_offers", ProductActiveOfferReadRepository)
 
-        # ═══════════════════════════════════════════════
-        # ORDERS DROPSHIPPING - READ/WRITE
-        # ═══════════════════════════════════════════════
-        self.dropshipping_orders = DropshippingOrderReadRepository(db_session)
-        self.dropshipping_order_lines = DropshippingOrderLineReadRepository(db_session)
-        self.supplier_orders = SupplierOrderReadRepository(db_session)
-        self.dropshipping_orders_w = DropshippingOrderWriteRepository(db_session)
-        self.dropshipping_order_lines_w = DropshippingOrderLineWriteRepository(db_session)
-        self.supplier_orders_w = SupplierOrderWriteRepository(db_session)
+    @property
+    def catalog_events(self) -> CatalogUpdateStreamReadRepository:
+        return self._get_repo("catalog_events", CatalogUpdateStreamReadRepository)
+
+    # ═══════════════════════════════════════════════
+    # CATALOG - WRITE
+    # ═══════════════════════════════════════════════
+
+    @property
+    def products_w(self) -> ProductWriteRepository:
+        return self._get_repo("products_w", ProductWriteRepository)
+
+    @property
+    def brands_w(self) -> BrandWriteRepository:
+        return self._get_repo("brands_w", BrandWriteRepository)
+
+    @property
+    def categories_w(self) -> CategoryWriteRepository:
+        return self._get_repo("categories_w", CategoryWriteRepository)
+
+    @property
+    def active_offers_w(self) -> ProductActiveOfferWriteRepository:
+        return self._get_repo("active_offers_w", ProductActiveOfferWriteRepository)
+
+    @property
+    def catalog_events_w(self) -> CatalogUpdateStreamWriteRepository:
+        return self._get_repo("catalog_events_w", CatalogUpdateStreamWriteRepository)
+
+    # ═══════════════════════════════════════════════
+    # PROCUREMENT - READ
+    # ═══════════════════════════════════════════════
+
+    @property
+    def suppliers(self) -> SupplierReadRepository:
+        return self._get_repo("suppliers", SupplierReadRepository)
+
+    @property
+    def feeds(self) -> SupplierFeedReadRepository:
+        return self._get_repo("feeds", SupplierFeedReadRepository)
+
+    @property
+    def feed_runs(self) -> FeedRunReadRepository:
+        return self._get_repo("feed_runs", FeedRunReadRepository)
+
+    @property
+    def mappers(self) -> MapperReadRepository:
+        return self._get_repo("mappers", MapperReadRepository)
+
+    @property
+    def supplier_items(self) -> SupplierItemReadRepository:
+        return self._get_repo("supplier_items", SupplierItemReadRepository)
+
+    @property
+    def product_events(self) -> ProductEventReadRepository:
+        return self._get_repo("product_events", ProductEventReadRepository)
+
+    # ═══════════════════════════════════════════════
+    # PROCUREMENT - WRITE
+    # ═══════════════════════════════════════════════
+
+    @property
+    def suppliers_w(self) -> SupplierWriteRepository:
+        return self._get_repo("suppliers_w", SupplierWriteRepository)
+
+    @property
+    def feeds_w(self) -> SupplierFeedWriteRepository:
+        return self._get_repo("feeds_w", SupplierFeedWriteRepository)
+
+    @property
+    def feed_runs_w(self) -> FeedRunWriteRepository:
+        return self._get_repo("feed_runs_w", FeedRunWriteRepository)
+
+    @property
+    def mappers_w(self) -> MapperWriteRepository:
+        return self._get_repo("mappers_w", MapperWriteRepository)
+
+    @property
+    def supplier_items_w(self) -> SupplierItemWriteRepository:
+        return self._get_repo("supplier_items_w", SupplierItemWriteRepository)
+
+    @property
+    def product_events_w(self) -> ProductEventWriteRepository:
+        return self._get_repo("product_events_w", ProductEventWriteRepository)
+
+    # ═══════════════════════════════════════════════
+    # WORKER - READ/WRITE
+    # ═══════════════════════════════════════════════
+
+    @property
+    def worker_jobs(self) -> WorkerJobReadRepository:
+        return self._get_repo("worker_jobs", WorkerJobReadRepository)
+
+    @property
+    def worker_jobs_w(self) -> WorkerJobWriteRepository:
+        return self._get_repo("worker_jobs_w", WorkerJobWriteRepository)
+
+    @property
+    def worker_activity(self) -> WorkerActivityReadRepository:
+        return self._get_repo("worker_activity", WorkerActivityReadRepository)
+
+    @property
+    def worker_activity_w(self) -> WorkerActivityWriteRepository:
+        return self._get_repo("worker_activity_w", WorkerActivityWriteRepository)
+
+    # ═══════════════════════════════════════════════
+    # AUDIT - READ/WRITE
+    # ═══════════════════════════════════════════════
+
+    @property
+    def audit_logs(self) -> AuditLogReadRepository:
+        return self._get_repo("audit_logs", AuditLogReadRepository)
+
+    @property
+    def audit_logs_w(self) -> AuditLogWriteRepository:
+        return self._get_repo("audit_logs_w", AuditLogWriteRepository)
+
+    # ═══════════════════════════════════════════════
+    # CONFIG - READ/WRITE
+    # ═══════════════════════════════════════════════
+
+    @property
+    def platform_config(self) -> PlatformConfigReadRepository:
+        return self._get_repo("platform_config", PlatformConfigReadRepository)
+
+    @property
+    def platform_config_w(self) -> PlatformConfigWriteRepository:
+        return self._get_repo("platform_config_w", PlatformConfigWriteRepository)
+
+    # ═══════════════════════════════════════════════
+    # ORDERS DROPSHIPPING - READ/WRITE
+    # ═══════════════════════════════════════════════
+
+    @property
+    def dropshipping_orders(self) -> DropshippingOrderReadRepository:
+        return self._get_repo("dropshipping_orders", DropshippingOrderReadRepository)
+
+    @property
+    def dropshipping_order_lines(self) -> DropshippingOrderLineReadRepository:
+        return self._get_repo("dropshipping_order_lines", DropshippingOrderLineReadRepository)
+
+    @property
+    def supplier_orders(self) -> SupplierOrderReadRepository:
+        return self._get_repo("supplier_orders", SupplierOrderReadRepository)
+
+    @property
+    def dropshipping_orders_w(self) -> DropshippingOrderWriteRepository:
+        return self._get_repo("dropshipping_orders_w", DropshippingOrderWriteRepository)
+
+    @property
+    def dropshipping_order_lines_w(self) -> DropshippingOrderLineWriteRepository:
+        return self._get_repo("dropshipping_order_lines_w", DropshippingOrderLineWriteRepository)
+
+    @property
+    def supplier_orders_w(self) -> SupplierOrderWriteRepository:
+        return self._get_repo("supplier_orders_w", SupplierOrderWriteRepository)
 
     @property
     def db(self) -> Session:

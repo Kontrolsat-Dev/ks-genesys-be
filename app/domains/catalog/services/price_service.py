@@ -82,22 +82,35 @@ class PriceService:
     def _round_to_40_or_90(price_with_vat: Decimal) -> Decimal:
         """
         Arredonda preço com IVA para o .40 ou .90 mais próximo.
+        Regra Especial (< 5€): Arredonda sempre para CIMA para o próximo patamar.
+        Regra Normal (>= 5€): Arredonda para o patamar mais PRÓXIMO.
         """
         euros = int(price_with_vat)
         cents = price_with_vat - euros
 
-        if cents <= Decimal("0.15"):
-            # Mais perto do .90 do euro anterior
-            if euros > 0:
-                return Decimal(f"{euros - 1}.90")
+        if price_with_vat < Decimal("5.00"):
+            # ARREDONDAR SEMPRE PARA CIMA (< 5€)
+            if cents > Decimal("0.90"):
+                return Decimal(f"{euros + 1}.40")
+            elif cents > Decimal("0.40"):
+                return Decimal(f"{euros}.90")
             else:
-                return Decimal("0.40")
-        elif cents <= Decimal("0.65"):
-            # Mais perto de .40
-            return Decimal(f"{euros}.40")
+                # 0.00 -> 0.40, 0.39 -> 0.40, 0.40 -> 0.40
+                return Decimal(f"{euros}.40")
         else:
-            # Mais perto de .90
-            return Decimal(f"{euros}.90")
+            # REGRA NORMAL (MAIS PRÓXIMO)
+            if cents <= Decimal("0.15"):
+                # Mais perto do .90 do euro anterior
+                if euros > 0:
+                    return Decimal(f"{euros - 1}.90")
+                else:
+                    return Decimal("0.40")
+            elif cents <= Decimal("0.65"):
+                # Mais perto de .40
+                return Decimal(f"{euros}.40")
+            else:
+                # Mais perto de .90
+                return Decimal(f"{euros}.90")
 
     @staticmethod
     def resolve_pricing_params(product, category=None, supplier=None) -> dict[str, float]:
