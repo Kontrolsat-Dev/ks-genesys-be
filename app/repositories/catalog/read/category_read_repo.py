@@ -4,6 +4,7 @@ from __future__ import annotations
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.errors import NotFound
 from app.core.normalize import normalize_key_ci
 from app.models.category import Category
 
@@ -18,13 +19,21 @@ class CategoryReadRepository:
         """Get category by ID."""
         return self.db.get(Category, id_category)
 
+    def get_required(self, id_category: int) -> Category:
+        """Get category by ID, raises NotFound if not exists."""
+        cat = self.db.get(Category, id_category)
+        if not cat:
+            raise NotFound(f"Category {id_category} not found")
+        return cat
+
     def get_by_name(self, name: str) -> Category | None:
         key = normalize_key_ci(name, MAX_NAME_LEN)
         if not key:
             return None
         return (
             self.db.execute(
-                select(Category).where(func.lower(func.btrim(Category.name)) == key).limit(1)
+                select(Category).where(func.lower(
+                    func.btrim(Category.name)) == key).limit(1)
             )
             .scalars()
             .first()
@@ -72,7 +81,8 @@ class CategoryReadRepository:
         )
 
         rows = (
-            self.db.execute(stmt.limit(page_size).offset((page - 1) * page_size))
+            self.db.execute(stmt.limit(page_size).offset(
+                (page - 1) * page_size))
             .scalars()
             .unique()
             .all()

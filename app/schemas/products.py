@@ -150,7 +150,8 @@ class ProductMarginUpdate(BaseModel):
 class ProductImportIn(BaseModel):
     """Payload para importar produto para PrestaShop."""
 
-    id_ps_category: int = Field(..., description="ID da categoria no PrestaShop")
+    id_ps_category: int = Field(...,
+                                description="ID da categoria no PrestaShop")
 
 
 class ProductImportOut(BaseModel):
@@ -230,3 +231,14 @@ class BulkImportOut(BaseModel):
     failed: int
     skipped: int  # Produtos já importados
     results: list[BulkImportItemResult] = Field(default_factory=list)
+
+
+# --------------------------
+
+class AddPrestashopMatchIn(BaseModel):
+    """Payload para dar match de produto de prestashop para sistema Genesys atraves de gtin"""
+
+    gtin: str
+    id_product_ecommerce: int
+    override: bool = Field(
+        default=False, description="Forçar remap mesmo que já exista associação")

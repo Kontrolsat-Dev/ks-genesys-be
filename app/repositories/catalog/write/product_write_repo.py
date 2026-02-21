@@ -129,3 +129,10 @@ class ProductWriteRepository(ProductReadRepository):
         if p.is_eol != is_eol:
             p.is_eol = is_eol
             self.db.flush()
+
+    def add_ecommerce_id(self, id_product_genesys: int, id_product_ecommerce) -> None:
+        p = self.get(id_product_genesys)
+        if not p:
+            return
+        p.id_ecommerce = id_product_ecommerce
+        self.db.flush()

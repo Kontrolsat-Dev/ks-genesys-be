@@ -22,7 +22,7 @@ class SageClient:
     def __init__(self):
         # Creds
         self.access_client: str | None = settings.SAGE_ACCESS_CLIENT
-        self.access_secret: str | None = settings.SAGE_ACCESS_CLIENT
+        self.access_secret: str | None = settings.SAGE_ACCESS_SECRET
         self.user_agent: str | None = settings.SAGE_USER_AGENT
 
         self.sage_base_url: str | None = settings.SAGE_BASE_URL

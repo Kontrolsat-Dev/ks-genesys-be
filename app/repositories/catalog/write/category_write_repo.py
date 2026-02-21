@@ -57,3 +57,13 @@ class CategoryWriteRepository(CategoryReadRepository):
     def delete(self, id_category: int) -> None:
         c = self.get_required(id_category)
         self.db.delete(c)
+
+    def clear_ps_mapping(self, id_category: int) -> Category:
+        """Remove o mapeamento PrestaShop de uma categoria."""
+        c = self.get_required(id_category)
+        c.id_ps_category = None
+        c.ps_category_name = None
+        c.auto_import = False
+        c.auto_import_since = None
+        self.db.flush()
+        return c
